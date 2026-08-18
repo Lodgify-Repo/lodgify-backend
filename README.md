@@ -1,98 +1,163 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Lodgify Enterprise API (Backend)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Welcome to the official backend repository for the **Lodgify Property & Hotel Management System**. This repository contains a production-ready, highly scalable enterprise API built with [NestJS](https://nestjs.com/).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🏗 Architecture Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The system is designed with enterprise-scale patterns to ensure maintainability, security, and developer productivity. Before you contribute, please familiarize yourself with the core architectural decisions that drive this API.
 
-## Project setup
+### 1. Global Prefixing & Versioning
+All API endpoints are globally prefixed and versioned. 
+By default, controllers will be accessible at: `http://localhost:3000/api/v1/[controller-path]`
 
-```bash
-$ yarn install
+### 2. Standardized Responses (`TransformInterceptor`)
+To keep frontend consumption predictable, all successful HTTP responses are automatically wrapped in a standardized envelope by the global `TransformInterceptor`. You do not need to wrap your controller returns; just return your data directly.
+```json
+{
+  "data": { ...your data... },
+  "meta": { "timestamp": "...", "path": "..." }
+}
 ```
 
-## Compile and run the project
+### 3. RFC 7807 Error Handling (`EnterpriseExceptionFilter`)
+All exceptions thrown across the application (e.g., `NotFoundException`, `BadRequestException`) are caught by a global exception filter and formatted to comply with the RFC 7807 standard for API errors. 
+```json
+{
+  "type": "https://api.lodgify.com/errors/bad-request",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Invalid parameters provided."
+}
+```
+*Note: Always throw standard NestJS HTTP Exceptions or custom domain exceptions (mapped via `DomainErrorCode`).*
 
-```bash
-# development
-$ yarn run start
+### 4. Database & Implicit Transactions (`TransactionManager`)
+We use **Prisma ORM** interacting with a PostgreSQL database. 
+To keep service layers clean, we implemented a custom `TransactionManager` backed by Node's `AsyncLocalStorage`. 
 
-# watch mode
-$ yarn run start:dev
+When you wrap an operation in `TransactionManager.run()`, the active transaction client is securely injected into the context. Our abstract `BaseService` intercepts Prisma calls and uses the transaction client automatically if one is active. **You never need to prop-drill the `tx` variable down to nested service calls.**
 
-# production mode
-$ yarn run start:prod
+### 5. Multi-Tenancy Context
+The application supports multi-tenancy. The `TenantContextMiddleware` securely decodes the JWT (or API Key) on incoming requests and injects the Tenant Payload into the request context.
+You can extract the current tenant easily in any controller using the custom decorator:
+```typescript
+@Get()
+getStats(@ActiveTenant() tenant: TenantPayload) {
+   return this.dashboardService.getStats(tenant.id);
+}
 ```
 
-## Run tests
+### 6. Authentication & RBAC (Role-Based Access Control)
+Authentication is handled via Passport.js and JWTs. 
+- Use `@UseGuards(JwtAuthGuard)` to protect routes.
+- Use `@Roles(Role.HOTEL_MANAGER, Role.SUPER_ADMIN)` to restrict access to specific user roles. The `RolesGuard` automatically validates the user's role against the required metadata.
 
+### 7. Background Jobs & Caching
+- **Caching**: We use `ioredis` directly via the `CacheService` for high-performance memory caching. It gracefully degrades if Redis is unavailable locally.
+- **Queues**: We use `BullMQ` via the `QueueService` for background tasks and async event processing.
+
+---
+
+## 🛠 How to Add a New Feature / Module
+
+We use the standard NestJS modular architecture. If you are adding a new business domain (e.g., "Invoices"), follow this blueprint:
+
+### Step 1: Update the Database Schema
+1. Open `prisma/schema.prisma` and add your new models.
+2. Run `npx prisma generate` to update the strictly-typed Prisma client.
+3. Run `npx prisma db push` (or `npx prisma migrate dev`) to update your local DB.
+
+### Step 2: Generate the NestJS Module
+Use the NestJS CLI to scaffold the module (this automatically adds it to `app.module.ts`):
 ```bash
-# unit tests
-$ yarn run test
-
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+nest g module modules/invoices
+nest g controller modules/invoices/http/invoices
+nest g service modules/invoices/services/invoices
 ```
 
-## Deployment
+### Step 3: Implement the Service
+Extend the `Service` base class to inherit built-in logging and contextual database querying abilities:
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Service } from '@/common/domain/base.service';
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+@Injectable()
+export class InvoicesService extends Service {
+  constructor() {
+    super('InvoicesService');
+  }
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+  async createInvoice(data: any) {
+    // Automatically uses a transaction if called within TransactionManager.run()
+    return await this.prisma.invoice.create({ data });
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Step 4: Implement the Controller
+1. Validate incoming data using DTOs (`class-validator`).
+2. Apply `JwtAuthGuard` and `RolesGuard` as needed.
+3. Keep the controller thin—delegate business logic to the service.
 
-## Resources
+```typescript
+@Controller('invoices')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class InvoicesController {
+  constructor(private readonly invoicesService: InvoicesService) {}
 
-Check out a few resources that may come in handy when working with NestJS:
+  @Roles(Role.HOTEL_MANAGER)
+  @Post()
+  async create(@Body() dto: CreateInvoiceDto) {
+    return this.invoicesService.createInvoice(dto);
+  }
+}
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
+## 🚀 Getting Started (Local Development)
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Prerequisites
+- Node.js (v18+)
+- Yarn
+- PostgreSQL (or Docker to run one)
+- Redis (Optional, but recommended for BullMQ and Caching)
 
-## Stay in touch
+### Setup Instructions
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. **Install Dependencies**
+   ```bash
+   yarn install
+   ```
 
-## License
+2. **Environment Variables**
+   Rename or copy `.env.example` to `.env` and fill in the required variables. 
+   ```bash
+   cp .env.example .env
+   ```
+   *Make sure `DATABASE_URL` points to a valid local Postgres instance.*
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+3. **Sync Database**
+   ```bash
+   npx prisma db push
+   ```
+
+4. **Start the Development Server**
+   ```bash
+   yarn start:dev
+   ```
+
+5. **View API Documentation (Swagger)**
+   Navigate to [http://localhost:3000/docs](http://localhost:3000/docs) in your browser to interact with the API directly!
+
+---
+
+## 🧪 Testing
+
+- **Unit Tests**: `yarn test`
+- **E2E Tests**: `yarn test:e2e`
+- **Test Coverage**: `yarn test:cov`
+
+*Ensure your newly added features are covered by tests before submitting a Pull Request.*
