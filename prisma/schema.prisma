@@ -1,0 +1,554 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// CORE: Auth & Users (F-A01 to F-A08)
+// ---------------------------------------------------------
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(GUEST)
+  phone     String?
+  avatarUrl String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  hotel           Hotel?
+  bookings        Booking[]
+  agentProfile    AgentProfile?
+  propertyReviews PropertyReview[]
+  inquiries       PropertyInquiry[]
+  offers          PurchaseOffer[]
+  viewings        ViewingAppointment[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  HOTEL_OWNER
+  HOTEL_MANAGER
+  FRONT_DESK
+  HOUSEKEEPING
+  RESTAURANT_STAFF
+  GUEST
+  AGENT
+}
+
+// ---------------------------------------------------------
+// CORE: Hotels & Branches (F-H01 to F-H05)
+// ---------------------------------------------------------
+model Hotel {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  ownerId         String   @unique
+  owner           User     @relation(fields: [ownerId], references: [id])
+  registrationNo  String?
+  taxId           String?
+  logoUrl         String?
+  status          String   @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  branches        Branch[]
+}
+
+model Branch {
+  id              String   @id @default(uuid())
+  hotelId         String
+  hotel           Hotel    @relation(fields: [hotelId], references: [id])
+  name            String
+  address         String
+  city            String
+  state           String
+  country         String
+  latitude        Float?
+  longitude       Float?
+  contactEmail    String
+  contactPhone    String
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  roomTypes       RoomType[]
+  bookings        Booking[]
+  inventoryItems  InventoryItem[]
+  purchaseOrders  PurchaseOrder[]
+  menuCategories  MenuCategory[]
+  foodOrders      FoodOrder[]
+}
+
+// ---------------------------------------------------------
+// CORE: Rooms & Room Types (F-R01 to F-R07)
+// ---------------------------------------------------------
+model RoomType {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  name            String
+  description     String?
+  basePrice       Float
+  maxOccupancy    Int
+  beds            Int
+  sizeSqft        Int?
+  images          String[]
+  amenities       String[] // e.g. ["WIFI", "AC", "TV"]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  rooms           Room[]
+  pricingRules    PricingRule[]
+}
+
+model Room {
+  id              String   @id @default(uuid())
+  roomTypeId      String
+  roomType        RoomType @relation(fields: [roomTypeId], references: [id])
+  roomNumber      String
+  floor           String?
+  status          RoomStatus @default(AVAILABLE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  bookings        Booking[]
+
+  @@unique([roomTypeId, roomNumber])
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  CLEANING
+  OUT_OF_ORDER
+}
+
+model PricingRule {
+  id              String   @id @default(uuid())
+  roomTypeId      String
+  roomType        RoomType @relation(fields: [roomTypeId], references: [id])
+  name            String
+  type            String   // SEASONAL, WEEKEND, EVENT
+  modifierType    String   // PERCENTAGE, FIXED_AMOUNT
+  modifierValue   Float
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// CORE: Bookings & Payments (F-B01 to F-B10)
+// ---------------------------------------------------------
+model Booking {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  guestId         String
+  guest           User     @relation(fields: [guestId], references: [id])
+  roomId          String?
+  room            Room?    @relation(fields: [roomId], references: [id])
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  guestsCount     Int
+  totalAmount     Float
+  status          BookingStatus @default(PENDING)
+  specialRequests String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  payments        Payment[]
+  foodOrders      FoodOrder[]
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  amount          Float
+  currency        String   @default("NGN")
+  method          String   // PAYSTACK, CASH, POS
+  status          PaymentStatus @default(PENDING)
+  reference       String   @unique
+  gatewayResponse Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// ---------------------------------------------------------
+// INVENTORY & PROCUREMENT (F-I01 to F-I12)
+// ---------------------------------------------------------
+model InventoryCategory {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           InventoryItem[]
+}
+
+model InventoryItem {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  categoryId      String
+  category        InventoryCategory @relation(fields: [categoryId], references: [id])
+  name            String
+  sku             String?
+  unit            String   // kg, pcs, liters
+  quantity        Float    @default(0)
+  minThreshold    Float
+  reorderQuantity Float?
+  costPerUnit     Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  transactions    InventoryTransaction[]
+  poItems         PurchaseOrderItem[]
+  recipeItems     MenuItemRecipe[]
+}
+
+model InventoryTransaction {
+  id              String   @id @default(uuid())
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  type            TransactionType
+  quantity        Float
+  remarks         String?
+  userId          String   // staff who made the transaction
+  createdAt       DateTime @default(now())
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model Supplier {
+  id              String   @id @default(uuid())
+  name            String
+  contactName     String?
+  email           String?
+  phone           String?
+  address         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  purchaseOrders  PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  status          POStatus @default(DRAFT)
+  totalAmount     Float    @default(0)
+  expectedDate    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  items           PurchaseOrderItem[]
+}
+
+enum POStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  FULFILLED
+  CANCELLED
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(uuid())
+  poId            String
+  purchaseOrder   PurchaseOrder @relation(fields: [poId], references: [id])
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  quantity        Float
+  unitPrice       Float
+  total           Float
+}
+
+// ---------------------------------------------------------
+// F&B / RESTAURANT (F-F01 to F-F12)
+// ---------------------------------------------------------
+model MenuCategory {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  name            String
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           MenuItem[]
+}
+
+model MenuItem {
+  id              String   @id @default(uuid())
+  categoryId      String
+  category        MenuCategory @relation(fields: [categoryId], references: [id])
+  name            String
+  description     String?
+  price           Float
+  imageUrl        String?
+  isAvailable     Boolean  @default(true)
+  preparationTime Int?     // in minutes
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  recipe          MenuItemRecipe[]
+  orderItems      FoodOrderItem[]
+}
+
+model MenuItemRecipe {
+  id              String   @id @default(uuid())
+  menuItemId      String
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  quantityNeeded  Float
+}
+
+model FoodOrder {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  bookingId       String?
+  booking         Booking? @relation(fields: [bookingId], references: [id])
+  tableNumber     String?
+  status          FoodOrderStatus @default(PENDING)
+  totalAmount     Float
+  specialNotes    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           FoodOrderItem[]
+}
+
+enum FoodOrderStatus {
+  PENDING
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model FoodOrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           FoodOrder @relation(fields: [orderId], references: [id])
+  menuItemId      String
+  menuItem        MenuItem  @relation(fields: [menuItemId], references: [id])
+  quantity        Int
+  unitPrice       Float
+  subtotal        Float
+  notes           String?
+}
+
+// ---------------------------------------------------------
+// PROPERTY MARKETPLACE (F-P01 to F-P12)
+// ---------------------------------------------------------
+model Property {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  type            String   // APARTMENT, VILLA, COMMERCIAL
+  listingType     String   // SALE, RENT
+  price           Float
+  currency        String   @default("NGN")
+  address         String
+  city            String
+  state           String
+  country         String
+  latitude        Float?
+  longitude       Float?
+  bedrooms        Int?
+  bathrooms       Int?
+  areaSqft        Int?
+  status          String   @default("AVAILABLE") // AVAILABLE, SOLD, RENTED, OFFLINE
+  features        String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  images          PropertyImage[]
+  inquiries       PropertyInquiry[]
+  reviews         PropertyReview[]
+  authorizations  AgentAuthorization[]
+  offers          PurchaseOffer[]
+  viewings        ViewingAppointment[]
+}
+
+model PropertyImage {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  url             String
+  isPrimary       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model PropertyInquiry {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  name            String
+  email           String
+  phone           String
+  message         String
+  status          String   @default("NEW") // NEW, READ, RESPONDED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PropertyReview {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  rating          Int
+  comment         String?
+  createdAt       DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// AGENTS & SALES (F-AG01 to F-AG12)
+// ---------------------------------------------------------
+model AgentProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  agencyName      String?
+  licenseNumber   String?
+  tier            String   @default("STANDARD") // STANDARD, PREMIUM
+  commissionRate  Float    @default(5.0)
+  totalSales      Float    @default(0)
+  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  authorizations  AgentAuthorization[]
+  leads           Lead[]
+  commissions     CommissionRecord[]
+}
+
+model AgentAuthorization {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  agreedRate      Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([agentId, propertyId])
+}
+
+model Lead {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  name            String
+  email           String?
+  phone           String?
+  source          String?
+  status          String   @default("NEW") // NEW, CONTACTED, QUALIFIED, LOST
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CommissionRecord {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  transactionType String   // SALE, RENTAL
+  amount          Float
+  status          String   @default("PENDING") // PENDING, PAID
+  paidAt          DateTime?
+  referenceId     String?  // ID of the sale/rental booking
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// OFFERS & VIEWINGS (F-PS01 to F-PS10)
+// ---------------------------------------------------------
+model PurchaseOffer {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  buyerName       String
+  buyerEmail      String
+  buyerPhone      String
+  offerAmount     Float
+  conditions      String?
+  status          String   @default("SUBMITTED") // SUBMITTED, ACCEPTED, REJECTED, COUNTERED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ViewingAppointment {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  clientName      String
+  clientEmail     String
+  clientPhone     String
+  scheduledDate   DateTime
+  status          String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
