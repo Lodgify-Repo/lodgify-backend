@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsDateString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsNumber, IsDateString, IsEnum, IsArray } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 
 export class SearchHotelsDto extends PaginationDto {
@@ -29,4 +29,23 @@ export class SearchHotelsDto extends PaginationDto {
   @Type(() => Number)
   @IsNumber()
   maxPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',') : value))
+  amenities?: string[];
+
+  @IsOptional()
+  @IsEnum(['price', 'name'] as const)
+  sortBy?: 'price' | 'name' = 'name';
+
+  @IsOptional()
+  @IsEnum(['asc', 'desc'] as const)
+  sortOrder?: 'asc' | 'desc' = 'asc';
 }
+
