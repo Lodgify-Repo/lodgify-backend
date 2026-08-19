@@ -1,6 +1,7 @@
-import { Controller, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from '../services/admin.service';
 import { UpdateUserStatusDto, VerifyAgentDto } from '../dto/admin.dto';
+import { SystemLogsQueryDto, ClearLogsDto } from '../dto/system-logs.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -33,7 +34,13 @@ export class AdminController {
   }
 
   @Get('logs')
-  async getSystemLogs() {
-    return this.adminService.getSystemLogs();
+  async getSystemLogs(@Query() dto: SystemLogsQueryDto) {
+    return this.adminService.getSystemLogs(dto);
+  }
+
+  @Delete('logs')
+  async clearAuditLogs(@Body() dto: ClearLogsDto) {
+    return this.adminService.clearAuditLogs(dto);
   }
 }
+

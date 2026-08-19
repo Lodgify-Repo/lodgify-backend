@@ -552,3 +552,55 @@ model ViewingAppointment {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+// ---------------------------------------------------------
+// SYSTEM: Audit Logs (F-ADM01)
+// ---------------------------------------------------------
+enum AuditLogLevel {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+enum AuditLogAction {
+  USER_LOGIN
+  USER_LOGOUT
+  USER_CREATED
+  USER_UPDATED
+  USER_SUSPENDED
+  USER_ACTIVATED
+  AGENT_VERIFIED
+  AGENT_REJECTED
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  PAYMENT_RECEIVED
+  PAYMENT_REFUNDED
+  ROOM_CREATED
+  ROOM_UPDATED
+  HOTEL_CREATED
+  HOTEL_UPDATED
+  SYSTEM_STARTUP
+  SYSTEM_ERROR
+  CONFIG_CHANGED
+}
+
+model AuditLog {
+  id          String         @id @default(uuid())
+  level       AuditLogLevel  @default(INFO)
+  action      AuditLogAction
+  message     String
+  actorId     String?
+  actorEmail  String?
+  targetType  String?
+  targetId    String?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+
+  @@index([level])
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+}
