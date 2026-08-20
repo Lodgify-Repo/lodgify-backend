@@ -38,15 +38,14 @@ export class InventoryService extends Service {
       throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK);
     }
 
-    // IN = add to current stock
+    // IN / ADJUSTMENT = add to current stock (ADJUSTMENT can have positive or negative quantity)
     // OUT = subtract from current stock
-    // ADJUSTMENT = set quantity to the exact value (physical count reconciliation)
     const updatedQuantity =
-      dto.type === 'IN'
+      dto.type === 'IN' || dto.type === 'ADJUSTMENT'
         ? item.quantity + dto.quantity
         : dto.type === 'OUT'
           ? item.quantity - dto.quantity
-          : dto.quantity;
+          : item.quantity;
 
     if (updatedQuantity < 0) {
       throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK, 'Resulting quantity cannot be negative');

@@ -153,8 +153,9 @@ export class BookingsService extends Service {
   }
 
   /**
-   * Calculates the total price for a stay, applying active pricing rules that
-   * overlap with the booking dates. Rules stack multiplicatively.
+   * Calculates the total price for a stay. Applies only the highest active pricing rule 
+   * (the one that results in the greatest absolute difference from the base price) 
+   * that overlaps with the booking dates.
    */
   private calculatePrice(
     basePrice: number,
@@ -163,21 +164,32 @@ export class BookingsService extends Service {
     checkOut: Date,
     pricingRules: Array<{ modifierType: string; modifierValue: number; startDate: Date; endDate: Date; isActive: boolean }>,
   ): number {
-    let total = basePrice * nights;
+    const baseTotal = basePrice * nights;
+    let finalTotal = baseTotal;
+    let maxDiff = 0;
 
-    // Apply active rules that overlap the stay dates (stack multiplicatively)
+    // Apply active rules that overlap the stay dates
     const applicableRules = pricingRules.filter(
       (rule) => rule.isActive && rule.startDate <= checkOut && rule.endDate >= checkIn,
     );
 
+    // Find the rule with the highest absolute modifier effect (largest surge or largest discount)
     for (const rule of applicableRules) {
+      let currentRuleTotal = baseTotal;
+      
       if (rule.modifierType === 'PERCENTAGE') {
-        total *= 1 + rule.modifierValue / 100;
+        currentRuleTotal = baseTotal * (1 + rule.modifierValue / 100);
       } else if (rule.modifierType === 'FIXED_AMOUNT') {
-        total += rule.modifierValue * nights;
+        currentRuleTotal = baseTotal + (rule.modifierValue * nights);
+      }
+
+      const diff = Math.abs(currentRuleTotal - baseTotal);
+      if (diff > maxDiff) {
+        maxDiff = diff;
+        finalTotal = currentRuleTotal;
       }
     }
 
-    return Math.round(total * 100) / 100; // round to 2 decimal places
+    return Math.round(finalTotal * 100) / 100; // round to 2 decimal places
   }
 }
