@@ -13,7 +13,13 @@ export const {
   GOOGLE_MAPS_KEY,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
-  GCS_BUCKET
+  GCS_BUCKET,
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_USER,
+  SMTP_PASS,
+  SMTP_FROM,
 } = process.env;
 
 export const allowedOrigins: string[] = ['http://localhost:5173', 'http://localhost:3000'] as const;
+

@@ -4,7 +4,7 @@ import { PrismaService } from '@/infra/database/prisma.service';
 import { CreateInventoryItemDto, InventoryTransactionDto } from '../dto/inventory.dto';
 import { DomainError } from '@/common/domain/error';
 import { InventoryErrorCodes } from '../errors';
-import { EventBus } from '@/common/events/event-bus';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class InventoryService extends Service {
@@ -38,11 +38,19 @@ export class InventoryService extends Service {
       throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK);
     }
 
-    const updatedQuantity = dto.type === 'IN' 
-      ? item.quantity + dto.quantity 
-      : dto.type === 'OUT' 
-        ? item.quantity - dto.quantity
-        : dto.quantity; // ADJUSTMENT sets it explicitly? Or adds/subtracts? Let's assume ADJUSTMENT sets.
+    // IN = add to current stock
+    // OUT = subtract from current stock
+    // ADJUSTMENT = set quantity to the exact value (physical count reconciliation)
+    const updatedQuantity =
+      dto.type === 'IN'
+        ? item.quantity + dto.quantity
+        : dto.type === 'OUT'
+          ? item.quantity - dto.quantity
+          : dto.quantity;
+
+    if (updatedQuantity < 0) {
+      throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK, 'Resulting quantity cannot be negative');
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const transaction = await tx.inventoryTransaction.create({
@@ -64,7 +72,11 @@ export class InventoryService extends Service {
     });
 
     if (result.updatedItem.quantity <= result.updatedItem.minThreshold) {
-      // EventBus.getInstance().emit('inventory:low_stock', { itemId, currentQuantity: result.updatedItem.quantity }, 'InventoryService');
+      EventBus.emit(
+        'inventory:low_stock',
+        { itemId, currentQuantity: result.updatedItem.quantity },
+        'InventoryService',
+      );
     }
 
     return result;

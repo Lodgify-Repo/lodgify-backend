@@ -4,7 +4,7 @@ import { PrismaService } from '@/infra/database/prisma.service';
 import { InitiatePaymentDto } from '../dto/payments.dto';
 import { PaystackService } from './paystack.service';
 import { v4 as uuidv4 } from 'uuid';
-import { EventBus } from '@/common/events/event-bus';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class PaymentsService extends Service {
@@ -18,7 +18,7 @@ export class PaymentsService extends Service {
   async initiate(initiatePaymentDto: InitiatePaymentDto) {
     const reference = `LODGIFY_${uuidv4()}`;
 
-    // 1. Save pending payment to DB
+    // Save pending payment to DB
     const payment = await this.prisma.payment.create({
       data: {
         bookingId: initiatePaymentDto.bookingId,
@@ -28,7 +28,7 @@ export class PaymentsService extends Service {
       },
     });
 
-    // 2. Call Paystack API
+    // Call Paystack API
     const response = await this.paystackService.initializePayment(
       initiatePaymentDto.email,
       initiatePaymentDto.amount * 100, // convert to kobo
@@ -41,27 +41,44 @@ export class PaymentsService extends Service {
     };
   }
 
-  async verifyWebhook(event: string, data: any) {
+  async verifyWebhook(rawBody: string, signature: string) {
+    // Verify HMAC signature
+    if (!this.paystackService.verifyWebhookSignature(rawBody, signature)) {
+      throw new Error('Invalid webhook signature');
+    }
+
+    const payload = JSON.parse(rawBody);
+    const event = payload.event;
+    const data = payload.data;
+
     if (event === 'charge.success') {
       const reference = data.reference;
       
       const payment = await this.prisma.payment.findUnique({ where: { reference } });
-      if (payment && payment.status !== 'SUCCESS') {
-        // 1. Mark as SUCCESS
-        await this.prisma.payment.update({
+
+      // Idempotency: skip if already processed
+      if (!payment || payment.status === 'SUCCESS') {
+        return;
+      }
+
+      // Wrap payment + booking update in a transaction
+      await this.prisma.$transaction(async (tx) => {
+        await tx.payment.update({
           where: { reference },
           data: { status: 'SUCCESS', gatewayResponse: data },
         });
 
-        // 2. Update booking status
-        await this.prisma.booking.update({
+        await tx.booking.update({
           where: { id: payment.bookingId },
           data: { status: 'CONFIRMED' },
         });
+      });
 
-        // 3. Emit event
-        // EventBus.getInstance().emit('payment:received', { reference, amount: payment.amount, bookingId: payment.bookingId }, 'PaymentsService');
-      }
+      EventBus.emit(
+        'payment:received',
+        { reference, amount: payment.amount, bookingId: payment.bookingId },
+        'PaymentsService',
+      );
     }
   }
 }

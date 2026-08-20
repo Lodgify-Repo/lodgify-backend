@@ -1,10 +1,12 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Headers } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { PaymentsService } from '../services/payments.service';
 import { InitiatePaymentDto } from '../dto/payments.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { Request } from 'express';
 
 @Controller('payments')
 export class PaymentsController {
@@ -18,9 +20,12 @@ export class PaymentsController {
   }
 
   @Post('webhook')
-  async webhook(@Body() payload: any) {
-    // In production, verify signature here using crypto
-    await this.paymentsService.verifyWebhook(payload.event, payload.data);
+  async webhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-paystack-signature') signature: string,
+  ) {
+    const rawBody = req.rawBody?.toString('utf-8') || '';
+    await this.paymentsService.verifyWebhook(rawBody, signature);
     return { status: 'ok' };
   }
 }

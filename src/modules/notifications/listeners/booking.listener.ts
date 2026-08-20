@@ -23,15 +23,27 @@ export class BookingListener implements OnModuleInit {
     
     const booking = await this.prisma.booking.findUnique({
       where: { id: payload.bookingId },
-      include: { guest: true, branch: true },
+      include: { guest: true, branch: true, room: true },
     });
 
     if (booking) {
+      const html = this.mailService.compileTemplate('booking_confirmation', {
+        guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
+        branchName: booking.branch.name,
+        checkInDate: booking.checkInDate.toLocaleDateString(),
+        checkOutDate: booking.checkOutDate.toLocaleDateString(),
+        roomNumber: booking.room?.roomNumber,
+        guestsCount: booking.guestsCount,
+        totalAmount: booking.totalAmount.toLocaleString(),
+        specialRequests: booking.specialRequests,
+        year: new Date().getFullYear(),
+      });
+
       await this.mailService.sendBulk([
         {
           to: booking.guest.email,
           subject: `Booking Confirmed - ${booking.branch.name}`,
-          html: `<h1>Your booking is confirmed!</h1><p>Check-in: ${booking.checkInDate.toISOString()}</p>`,
+          html,
         }
       ], 'booking_confirmation');
     }
@@ -39,6 +51,29 @@ export class BookingListener implements OnModuleInit {
 
   async handleBookingCancelled(payload: { bookingId: string; reason?: string }) {
     this.logger.info(`Received booking:cancelled for ${payload.bookingId}`);
-    // Implementation for cancellation
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: payload.bookingId },
+      include: { guest: true, branch: true },
+    });
+
+    if (booking) {
+      const html = this.mailService.compileTemplate('booking_cancellation', {
+        guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
+        branchName: booking.branch.name,
+        checkInDate: booking.checkInDate.toLocaleDateString(),
+        checkOutDate: booking.checkOutDate.toLocaleDateString(),
+        reason: payload.reason,
+        year: new Date().getFullYear(),
+      });
+
+      await this.mailService.sendBulk([
+        {
+          to: booking.guest.email,
+          subject: `Booking Cancelled - ${booking.branch.name}`,
+          html,
+        }
+      ], 'booking_cancellation');
+    }
   }
 }

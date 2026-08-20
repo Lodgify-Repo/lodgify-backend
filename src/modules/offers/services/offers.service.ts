@@ -4,7 +4,7 @@ import { PrismaService } from '@/infra/database/prisma.service';
 import { CreateOfferDto, UpdateOfferStatusDto } from '../dto/offers.dto';
 import { DomainError } from '@/common/domain/error';
 import { OfferErrorCodes } from '../errors';
-import { EventBus } from '@/common/events/event-bus';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class OffersService extends Service {
@@ -13,21 +13,57 @@ export class OffersService extends Service {
   }
 
   async create(userId: string, createOfferDto: CreateOfferDto) {
+    // Validate user exists
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new DomainError(
+        OfferErrorCodes.OFFER_USER_NOT_FOUND,
+        `User ${userId} not found`,
+      );
+    }
+
+    // Validate property exists
+    const property = await this.prisma.property.findUnique({
+      where: { id: createOfferDto.propertyId },
+      select: { id: true },
+    });
+    if (!property) {
+      throw new DomainError(
+        OfferErrorCodes.OFFER_PROPERTY_NOT_FOUND,
+        `Property ${createOfferDto.propertyId} not found`,
+      );
+    }
+
+    // Check for existing PENDING offer from same user on same property
+    const existingOffer = await this.prisma.purchaseOffer.findFirst({
+      where: {
+        userId,
+        propertyId: createOfferDto.propertyId,
+        status: 'PENDING',
+      },
+      select: { id: true },
+    });
+    if (existingOffer) {
+      throw new DomainError(
+        OfferErrorCodes.OFFER_DUPLICATE_PENDING,
+        'You already have a pending offer on this property',
+        { existingOfferId: existingOffer.id },
+      );
+    }
+
     const offer = await this.prisma.purchaseOffer.create({
       data: {
         userId,
-        buyerName: user ? `${user.firstName} ${user.lastName}` : 'Guest',
-        buyerEmail: user?.email || 'guest@lodgify.com',
-        buyerPhone: user?.phone || '000000000',
+        buyerName: `${user.firstName} ${user.lastName}`,
+        buyerEmail: user.email,
+        buyerPhone: user.phone || '',
         propertyId: createOfferDto.propertyId,
         offerAmount: createOfferDto.amount,
         conditions: createOfferDto.message,
       },
     });
 
-    // Notify agent
-    // EventBus.getInstance().emit('offer:created', { agentId: offer.property.agentId, offerId: offer.id }, 'OffersService');
+    EventBus.emit('offer:received', { offerId: offer.id, propertyId: offer.propertyId }, 'OffersService');
 
     return offer;
   }
@@ -55,9 +91,13 @@ export class OffersService extends Service {
       throw new DomainError(OfferErrorCodes.OFFER_NOT_FOUND);
     }
 
-    return await this.prisma.purchaseOffer.update({
+    const updated = await this.prisma.purchaseOffer.update({
       where: { id },
       data: { status: updateDto.status },
     });
+
+    EventBus.emit('offer:responded', { offerId: updated.id, status: updated.status }, 'OffersService');
+
+    return updated;
   }
 }

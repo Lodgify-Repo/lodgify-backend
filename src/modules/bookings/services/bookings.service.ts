@@ -4,7 +4,7 @@ import { PrismaService } from '@/infra/database/prisma.service';
 import { CreateBookingDto, UpdateBookingStatusDto } from '../dto/bookings.dto';
 import { DomainError } from '@/common/domain/error';
 import { BookingErrorCodes } from '../errors';
-import { EventBus } from '@/common/events/event-bus';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class BookingsService extends Service {
@@ -13,27 +13,109 @@ export class BookingsService extends Service {
   }
 
   async create(guestId: string, createBookingDto: CreateBookingDto) {
-    // 1. Calculate price, check availability, etc.
     const { branchId, roomId, checkInDate, checkOutDate, guestsCount, specialRequests } = createBookingDto;
 
-    // simplistic calculation
-    const totalAmount = 50000; 
+    const checkIn = new Date(checkInDate);
+    const checkOut = new Date(checkOutDate);
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        guestId,
-        branchId,
-        roomId,
-        checkInDate: new Date(checkInDate),
-        checkOutDate: new Date(checkOutDate),
-        guestsCount,
-        totalAmount,
-        specialRequests,
-      },
+    // Validate dates
+    if (checkIn.getTime() <= Date.now()) {
+      throw new DomainError(BookingErrorCodes.INVALID_DATES, 'Check-in date must be in the future');
+    }
+
+    if (checkOut.getTime() <= checkIn.getTime()) {
+      throw new DomainError(BookingErrorCodes.INVALID_DATES, 'Check-out date must be after check-in date');
+    }
+
+    // Validate branch exists
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true },
+    });
+    if (!branch) {
+      throw new DomainError(BookingErrorCodes.BRANCH_NOT_FOUND, `Branch ${branchId} not found`);
+    }
+
+    // Validate room if provided
+    let roomType: { basePrice: number; pricingRules: Array<{ modifierType: string; modifierValue: number; startDate: Date; endDate: Date; isActive: boolean }> } | null = null;
+
+    if (roomId) {
+      const room = await this.prisma.room.findUnique({
+        where: { id: roomId },
+        include: {
+          roomType: {
+            include: {
+              pricingRules: {
+                where: { isActive: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!room) {
+        throw new DomainError(BookingErrorCodes.ROOM_NOT_FOUND, `Room ${roomId} not found`);
+      }
+
+      if (room.roomType.branchId !== branchId) {
+        throw new DomainError(BookingErrorCodes.ROOM_NOT_FOUND, 'Room does not belong to the specified branch');
+      }
+
+      if (room.status !== 'AVAILABLE') {
+        throw new DomainError(BookingErrorCodes.ROOM_UNAVAILABLE, `Room ${room.roomNumber} is currently ${room.status}`);
+      }
+
+      roomType = room.roomType;
+    }
+
+    // Calculate price
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    let totalAmount: number;
+
+    if (roomType) {
+      totalAmount = this.calculatePrice(roomType.basePrice, nights, checkIn, checkOut, roomType.pricingRules);
+    } else {
+      // No room specified — default price will be set when room is assigned
+      totalAmount = 0;
+    }
+
+    // Availability check + create inside a transaction
+    const booking = await this.prisma.$transaction(async (tx) => {
+      if (roomId) {
+        const overlapping = await tx.booking.findFirst({
+          where: {
+            roomId,
+            status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+            checkInDate: { lt: checkOut },
+            checkOutDate: { gt: checkIn },
+          },
+          select: { id: true },
+        });
+
+        if (overlapping) {
+          throw new DomainError(
+            BookingErrorCodes.ROOM_UNAVAILABLE,
+            'Room is already booked for the requested dates',
+            { conflictingBookingId: overlapping.id },
+          );
+        }
+      }
+
+      return await tx.booking.create({
+        data: {
+          guestId,
+          branchId,
+          roomId,
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
+          guestsCount,
+          totalAmount,
+          specialRequests,
+        },
+      });
     });
 
-    // TODO: use EventBus.getInstance().emit
-    // EventBus.getInstance().emit('booking:confirmed', { bookingId: booking.id, hotelId: branchId }, 'BookingsService');
+    EventBus.emit('booking:confirmed', { bookingId: booking.id, hotelId: branchId }, 'BookingsService');
 
     return booking;
   }
@@ -66,7 +148,36 @@ export class BookingsService extends Service {
 
     return await this.prisma.booking.update({
       where: { id },
-      data: { status: updateBookingStatusDto.status as any },
+      data: { status: updateBookingStatusDto.status },
     });
+  }
+
+  /**
+   * Calculates the total price for a stay, applying active pricing rules that
+   * overlap with the booking dates. Rules stack multiplicatively.
+   */
+  private calculatePrice(
+    basePrice: number,
+    nights: number,
+    checkIn: Date,
+    checkOut: Date,
+    pricingRules: Array<{ modifierType: string; modifierValue: number; startDate: Date; endDate: Date; isActive: boolean }>,
+  ): number {
+    let total = basePrice * nights;
+
+    // Apply active rules that overlap the stay dates (stack multiplicatively)
+    const applicableRules = pricingRules.filter(
+      (rule) => rule.isActive && rule.startDate <= checkOut && rule.endDate >= checkIn,
+    );
+
+    for (const rule of applicableRules) {
+      if (rule.modifierType === 'PERCENTAGE') {
+        total *= 1 + rule.modifierValue / 100;
+      } else if (rule.modifierType === 'FIXED_AMOUNT') {
+        total += rule.modifierValue * nights;
+      }
+    }
+
+    return Math.round(total * 100) / 100; // round to 2 decimal places
   }
 }
