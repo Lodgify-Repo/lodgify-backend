@@ -122,7 +122,7 @@ export class BookingsService extends Service {
 
   async findByGuest(guestId: string) {
     return await this.prisma.booking.findMany({
-      where: { guestId, ...this.commonQueries.notDeleted },
+      where: { guestId },
       include: {
         branch: { select: { name: true } },
         room: { select: { roomNumber: true } }
@@ -132,7 +132,7 @@ export class BookingsService extends Service {
 
   async findByBranch(branchId: string) {
     return await this.prisma.booking.findMany({
-      where: { branchId, ...this.commonQueries.notDeleted },
+      where: { branchId },
       include: {
         guest: { select: { firstName: true, lastName: true, email: true } },
         room: { select: { roomNumber: true } }

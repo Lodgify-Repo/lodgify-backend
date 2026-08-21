@@ -13,7 +13,7 @@ export class UsersService extends Service {
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId, ...this.commonQueries.notDeleted },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -36,7 +36,7 @@ export class UsersService extends Service {
 
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId, ...this.commonQueries.notDeleted },
+      where: { id: userId },
     });
 
     if (!user) {

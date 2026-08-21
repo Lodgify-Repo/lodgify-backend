@@ -30,7 +30,7 @@ export class HotelsService extends Service {
 
   async findByOwner(ownerId: string) {
     const hotel = await this.prisma.hotel.findUnique({
-      where: { ownerId, ...this.commonQueries.notDeleted },
+      where: { ownerId },
       include: { branches: true },
     });
 

@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DB } from '@/common/constants';
 import Logger from '@/infra/logger/logger.service';
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleDestroy {
   private queues = new Map<string, Queue>();
   private readonly logger = Logger.getInstance('server');
 
@@ -27,5 +27,12 @@ export class QueueService {
   public async addJob(queueName: string, jobName: string, data: any, opts?: any): Promise<void> {
     const queue = this.getQueue(queueName);
     await queue.add(jobName, data, opts);
+  }
+
+  async onModuleDestroy() {
+    for (const [name, queue] of this.queues) {
+      await queue.close();
+      this.logger.info(`Closed queue: ${name}`);
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Controller, Post, Body, UseGuards, Req, Headers } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { PaymentsService } from '../services/payments.service';
@@ -8,6 +9,8 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
 
+@ApiTags('Payments')
+@ApiBearerAuth('access-token')
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
@@ -15,11 +18,13 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.GUEST, Role.FRONT_DESK)
   @Post('initiate')
+  @ApiOperation({ summary: 'Initiate' })
   async initiate(@Body() initiatePaymentDto: InitiatePaymentDto) {
     return this.paymentsService.initiate(initiatePaymentDto);
   }
 
   @Post('webhook')
+  @ApiOperation({ summary: 'Webhook' })
   async webhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-paystack-signature') signature: string,

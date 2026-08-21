@@ -19,7 +19,7 @@ export class FoodService extends Service {
 
   async getMenuItemsByCategory(categoryId: string) {
     return await this.prisma.menuItem.findMany({
-      where: { categoryId, ...this.commonQueries.notDeleted },
+      where: { categoryId },
     });
   }
 

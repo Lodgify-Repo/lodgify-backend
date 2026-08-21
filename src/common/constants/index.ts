@@ -19,7 +19,13 @@ export const {
   SMTP_USER,
   SMTP_PASS,
   SMTP_FROM,
+  ALLOWED_ORIGINS,
 } = process.env;
 
-export const allowedOrigins: string[] = ['http://localhost:5173', 'http://localhost:3000'] as const;
+const DEFAULT_ORIGINS = ['http://localhost:5173', 'http://localhost:3000'];
+
+/** CORS origins parsed from ALLOWED_ORIGINS env (comma-separated), with localhost fallback */
+export const allowedOrigins: string[] = ALLOWED_ORIGINS
+  ? ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : DEFAULT_ORIGINS;
 

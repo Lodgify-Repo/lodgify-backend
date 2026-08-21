@@ -1,3 +1,4 @@
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Controller, Post, Get, Body, UseGuards, Request, Param, Patch } from '@nestjs/common';
 import { BookingsService } from '../services/bookings.service';
 import { CreateBookingDto, UpdateBookingStatusDto } from '../dto/bookings.dto';
@@ -6,6 +7,8 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
+@ApiTags('Bookings')
+@ApiBearerAuth('access-token')
 @Controller('bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BookingsController {
@@ -13,24 +16,28 @@ export class BookingsController {
 
   @Roles(Role.GUEST)
   @Post()
+  @ApiOperation({ summary: 'Create' })
   async create(@Request() req: any, @Body() createBookingDto: CreateBookingDto) {
     return this.bookingsService.create(req.user.id, createBookingDto);
   }
 
   @Roles(Role.GUEST)
   @Get('my-bookings')
+  @ApiOperation({ summary: 'Get my bookings' })
   async getMyBookings(@Request() req: any) {
     return this.bookingsService.findByGuest(req.user.id);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK)
   @Get('branch/:branchId')
+  @ApiOperation({ summary: 'Get branch bookings' })
   async getBranchBookings(@Param('branchId') branchId: string) {
     return this.bookingsService.findByBranch(branchId);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK)
   @Patch(':id/status')
+  @ApiOperation({ summary: 'Update status' })
   async updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateBookingStatusDto) {
     return this.bookingsService.updateStatus(id, updateStatusDto);
   }

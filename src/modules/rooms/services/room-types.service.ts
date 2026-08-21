@@ -22,14 +22,14 @@ export class RoomTypesService extends Service {
 
   async findAll(branchId: string) {
     return await this.prisma.roomType.findMany({
-      where: { branchId, ...this.commonQueries.notDeleted },
+      where: { branchId },
       include: { pricingRules: true },
     });
   }
 
   async findOne(id: string) {
     const roomType = await this.prisma.roomType.findUnique({
-      where: { id, ...this.commonQueries.notDeleted },
+      where: { id },
       include: { pricingRules: true },
     });
 

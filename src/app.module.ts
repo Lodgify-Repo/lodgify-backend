@@ -23,10 +23,13 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { OffersModule } from './modules/offers/offers.module';
 import { ViewingsModule } from './modules/viewings/viewings.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { HealthModule } from './modules/health/health.module';
+
+import { envValidationSchema } from './common/config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validationSchema: envValidationSchema }),
     DatabaseModule,
     CacheModule,
     MailModule,
@@ -49,6 +52,7 @@ import { AdminModule } from './modules/admin/admin.module';
     OffersModule,
     ViewingsModule,
     AdminModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [],

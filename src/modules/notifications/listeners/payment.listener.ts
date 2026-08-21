@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import EventBus from '@/common/events/event-bus';
 import { MailService } from '@/infra/mail/mail.service';
+import { QueueService } from '@/infra/queue/queue.service';
+import { EMAIL_QUEUE_NAME } from '@/infra/queue/email.worker';
 import Logger from '@/infra/logger/logger.service';
 import { PrismaService } from '@/infra/database/prisma.service';
 
@@ -10,6 +12,7 @@ export class PaymentListener implements OnModuleInit {
 
   constructor(
     private readonly mailService: MailService,
+    private readonly queueService: QueueService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -44,13 +47,19 @@ export class PaymentListener implements OnModuleInit {
         year: new Date().getFullYear(),
       });
 
-      await this.mailService.sendBulk([
-        {
-          to: booking.guest.email,
-          subject: `Payment Receipt - ${payload.reference}`,
-          html,
-        }
-      ], 'payment_receipt');
+      await this.queueService.addJob(EMAIL_QUEUE_NAME, 'payment_receipt', {
+        emails: [
+          {
+            to: booking.guest.email,
+            subject: `Payment Receipt - ${payload.reference}`,
+            html,
+          }
+        ],
+        tag: 'payment_receipt',
+      }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
     }
   }
 }

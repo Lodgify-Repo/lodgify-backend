@@ -27,14 +27,13 @@ export class PropertiesService extends Service {
 
   async findAll() {
     return await this.prisma.property.findMany({
-      where: this.commonQueries.notDeleted,
       include: { images: true },
     });
   }
 
   async findOne(id: string) {
     const property = await this.prisma.property.findUnique({
-      where: { id, ...this.commonQueries.notDeleted },
+      where: { id },
       include: { images: true },
     });
 

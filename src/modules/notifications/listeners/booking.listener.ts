@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import EventBus from '@/common/events/event-bus';
 import { MailService } from '@/infra/mail/mail.service';
+import { QueueService } from '@/infra/queue/queue.service';
+import { EMAIL_QUEUE_NAME } from '@/infra/queue/email.worker';
 import Logger from '@/infra/logger/logger.service';
 import { PrismaService } from '@/infra/database/prisma.service';
 
@@ -10,6 +12,7 @@ export class BookingListener implements OnModuleInit {
 
   constructor(
     private readonly mailService: MailService,
+    private readonly queueService: QueueService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -39,13 +42,19 @@ export class BookingListener implements OnModuleInit {
         year: new Date().getFullYear(),
       });
 
-      await this.mailService.sendBulk([
-        {
-          to: booking.guest.email,
-          subject: `Booking Confirmed - ${booking.branch.name}`,
-          html,
-        }
-      ], 'booking_confirmation');
+      await this.queueService.addJob(EMAIL_QUEUE_NAME, 'booking_confirmation', {
+        emails: [
+          {
+            to: booking.guest.email,
+            subject: `Booking Confirmed - ${booking.branch.name}`,
+            html,
+          }
+        ],
+        tag: 'booking_confirmation',
+      }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
     }
   }
 
@@ -67,13 +76,19 @@ export class BookingListener implements OnModuleInit {
         year: new Date().getFullYear(),
       });
 
-      await this.mailService.sendBulk([
-        {
-          to: booking.guest.email,
-          subject: `Booking Cancelled - ${booking.branch.name}`,
-          html,
-        }
-      ], 'booking_cancellation');
+      await this.queueService.addJob(EMAIL_QUEUE_NAME, 'booking_cancellation', {
+        emails: [
+          {
+            to: booking.guest.email,
+            subject: `Booking Cancelled - ${booking.branch.name}`,
+            html,
+          }
+        ],
+        tag: 'booking_cancellation',
+      }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
     }
   }
 }

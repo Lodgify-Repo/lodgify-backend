@@ -34,7 +34,6 @@ export class RoomsService extends Service {
     return await this.prisma.room.findMany({
       where: {
         roomType: { branchId },
-        ...this.commonQueries.notDeleted,
       },
       include: { roomType: true },
     });

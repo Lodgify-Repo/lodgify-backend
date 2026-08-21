@@ -39,7 +39,7 @@ export class AgentsService extends Service {
 
   async getProfile(userId: string) {
     const profile = await this.prisma.agentProfile.findUnique({
-      where: { userId, ...this.commonQueries.notDeleted },
+      where: { userId },
     });
 
     if (!profile) {
@@ -60,7 +60,7 @@ export class AgentsService extends Service {
 
   async getAllAgents() {
     return await this.prisma.agentProfile.findMany({
-      where: { status: 'VERIFIED', ...this.commonQueries.notDeleted },
+      where: { status: 'VERIFIED' },
       include: {
         user: { select: { firstName: true, lastName: true, avatarUrl: true } },
       },

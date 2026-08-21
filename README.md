@@ -1,4 +1,4 @@
-# Lodgify Enterprise API (Backend)
+# Lodgify API (Backend)
 
 Welcome to the official backend repository for the **Lodgify Property & Hotel Management System**. This repository contains a production-ready, highly scalable enterprise API built with [NestJS](https://nestjs.com/).
 
@@ -57,6 +57,15 @@ Authentication is handled via Passport.js and JWTs.
 ### 7. Background Jobs & Caching
 - **Caching**: We use `ioredis` directly via the `CacheService` for high-performance memory caching. It gracefully degrades if Redis is unavailable locally.
 - **Queues**: We use `BullMQ` via the `QueueService` for background tasks and async event processing.
+
+### 8. Event-Driven Architecture
+We use `@nestjs/event-emitter` to decouple domain logic from side-effects. For example, when a booking is created or a payment succeeds, domain events are emitted which trigger asynchronous listeners (e.g., sending email receipts via Handlebars templates) without blocking the main request cycle.
+
+### 9. Audit Logging
+Critical entity changes and actions are automatically tracked via a built-in database audit logging system, ensuring full traceability and compliance for enterprise operations.
+
+### 10. Third-Party Integrations
+The system integrates natively with **Paystack** for secure payment processing, alongside Google Cloud and Google Maps for storage and location services.
 
 ---
 
@@ -138,6 +147,7 @@ export class InvoicesController {
    cp .env.example .env
    ```
    *Make sure `DATABASE_URL` points to a valid local Postgres instance.*
+   *Note: For features like payments and file uploads to work, ensure `PAYSTACK_SECRET_KEY`, `GOOGLE_MAPS_KEY`, and GCS credentials are provided.*
 
 3. **Sync Database**
    ```bash

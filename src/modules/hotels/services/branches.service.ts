@@ -22,13 +22,13 @@ export class BranchesService extends Service {
 
   async findAll(hotelId: string) {
     return await this.prisma.branch.findMany({
-      where: { hotelId, ...this.commonQueries.notDeleted },
+      where: { hotelId },
     });
   }
 
   async findOne(id: string) {
     const branch = await this.prisma.branch.findUnique({
-      where: { id, ...this.commonQueries.notDeleted },
+      where: { id },
     });
 
     if (!branch) {

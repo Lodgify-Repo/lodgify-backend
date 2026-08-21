@@ -9,7 +9,5 @@ export class Service {
     warn: (message: string, ...args: any[]) => this._logger.warn(`[${this.constructor.name}]: ${message}`, ...args),
   };
 
-  protected readonly commonQueries = {
-    notDeleted: { deletedAt: null },
-  };
+  protected readonly commonQueries = {};
 }

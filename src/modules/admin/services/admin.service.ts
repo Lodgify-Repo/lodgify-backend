@@ -31,7 +31,6 @@ export class AdminService extends Service {
 
   async getAllUsers() {
     return await this.prisma.user.findMany({
-      where: this.commonQueries.notDeleted,
       select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
     });
   }

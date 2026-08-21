@@ -1,3 +1,4 @@
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Controller, Post, Get, Body, UseGuards, Request, Patch } from '@nestjs/common';
 import { HotelsService } from '../services/hotels.service';
 import { CreateHotelDto, UpdateHotelDto } from '../dto/hotels.dto';
@@ -6,6 +7,8 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
+@ApiTags('Hotels')
+@ApiBearerAuth('access-token')
 @Controller('hotels')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class HotelsController {
@@ -13,18 +16,21 @@ export class HotelsController {
 
   @Roles(Role.HOTEL_OWNER)
   @Post()
+  @ApiOperation({ summary: 'Create' })
   async create(@Request() req: any, @Body() createHotelDto: CreateHotelDto) {
     return this.hotelsService.create(req.user.id, createHotelDto);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
   @Get('my-hotel')
+  @ApiOperation({ summary: 'Get my hotel' })
   async getMyHotel(@Request() req: any) {
     return this.hotelsService.findByOwner(req.user.id);
   }
 
   @Roles(Role.HOTEL_OWNER)
   @Patch('my-hotel')
+  @ApiOperation({ summary: 'Update my hotel' })
   async updateMyHotel(@Request() req: any, @Body() updateHotelDto: UpdateHotelDto) {
     return this.hotelsService.update(req.user.id, updateHotelDto);
   }

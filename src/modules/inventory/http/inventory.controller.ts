@@ -1,3 +1,4 @@
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Controller, Post, Get, Body, UseGuards, Request, Param } from '@nestjs/common';
 import { InventoryService } from '../services/inventory.service';
 import { CreateInventoryItemDto, InventoryTransactionDto } from '../dto/inventory.dto';
@@ -6,6 +7,8 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
+@ApiTags('Inventory')
+@ApiBearerAuth('access-token')
 @Controller('branches/:branchId/inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InventoryController {
@@ -13,18 +16,21 @@ export class InventoryController {
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
   @Post('items')
+  @ApiOperation({ summary: 'Create item' })
   async createItem(@Param('branchId') branchId: string, @Body() createDto: CreateInventoryItemDto) {
     return this.inventoryService.createItem(branchId, createDto);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
   @Get('items')
+  @ApiOperation({ summary: 'Get items' })
   async getItems(@Param('branchId') branchId: string) {
     return this.inventoryService.getItemsByBranch(branchId);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
   @Post('items/:itemId/transactions')
+  @ApiOperation({ summary: 'Record transaction' })
   async recordTransaction(
     @Request() req: any, 
     @Param('itemId') itemId: string, 

@@ -23,7 +23,7 @@ export class InventoryService extends Service {
 
   async getItemsByBranch(branchId: string) {
     return await this.prisma.inventoryItem.findMany({
-      where: { branchId, ...this.commonQueries.notDeleted },
+      where: { branchId },
       include: { category: true },
     });
   }

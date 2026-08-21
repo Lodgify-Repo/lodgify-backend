@@ -37,8 +37,7 @@ export class SearchService extends Service {
     // 1. Build the base Branch filter
     const where: Prisma.BranchWhereInput = {
       status: 'ACTIVE',
-      deletedAt: null,
-    };
+      };
 
     // Text search across branch name, city, state, and hotel name
     if (query) {
@@ -55,7 +54,7 @@ export class SearchService extends Service {
     }
 
     // 2. Build room-type sub-filter for capacity, amenities, and price
-    const roomTypeFilter: Prisma.RoomTypeWhereInput = { deletedAt: null };
+    const roomTypeFilter: Prisma.RoomTypeWhereInput = { };
 
     if (guests) {
       roomTypeFilter.maxOccupancy = { gte: guests };
@@ -82,7 +81,6 @@ export class SearchService extends Service {
       const overlappingBookings = await this.prisma.booking.findMany({
         where: {
           status: { in: [BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, BookingStatus.PENDING] },
-          deletedAt: null,
           roomId: { not: null },
           // Overlap condition: existing.checkIn < requested.checkOut AND existing.checkOut > requested.checkIn
           checkInDate: { lt: checkOutDate },
@@ -99,7 +97,6 @@ export class SearchService extends Service {
     // Require branches to have at least one qualifying room type
     // with at least one available (non-booked, non-out-of-order) room
     const roomFilter: Prisma.RoomWhereInput = {
-      deletedAt: null,
       status: { not: RoomStatus.OUT_OF_ORDER },
     };
 
@@ -131,7 +128,6 @@ export class SearchService extends Service {
           roomTypes: {
             where: {
               ...roomTypeFilter,
-              deletedAt: null,
               rooms: { some: roomFilter },
             },
             include: {
