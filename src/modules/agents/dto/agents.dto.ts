@@ -32,3 +32,13 @@ export class CreateAgentProfileDto {
 }
 
 export class UpdateAgentProfileDto extends CreateAgentProfileDto {}
+
+export class SubmitAgentVerificationDto {
+  @ApiProperty({ description: 'GCS URL of the license document' })
+  @IsString()
+  licenseUrl: string;
+
+  @ApiProperty({ description: 'GCS URL of the company registration document' })
+  @IsString()
+  companyRegistrationUrl: string;
+}

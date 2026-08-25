@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import Redis from 'ioredis';
+import cookieParser from 'cookie-parser';
 import { allowedOrigins } from './common/constants';
 
 async function bootstrap() {
@@ -19,6 +20,7 @@ async function bootstrap() {
   });
 
   app.use(helmet());
+  app.use(cookieParser());
 
   const redisClient = new Redis({
     host: process.env.REDIS_HOST || 'localhost',

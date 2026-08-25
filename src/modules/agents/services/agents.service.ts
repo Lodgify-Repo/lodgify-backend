@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Service } from '@/common/domain/base.service';
 import { PrismaService } from '@/infra/database/prisma.service';
-import { CreateAgentProfileDto, UpdateAgentProfileDto } from '../dto/agents.dto';
+import { CreateAgentProfileDto, UpdateAgentProfileDto, SubmitAgentVerificationDto } from '../dto/agents.dto';
 import { DomainError } from '@/common/domain/error';
 import { AgentErrorCodes } from '../errors';
 import { Role } from '@prisma/client';
@@ -32,7 +32,7 @@ export class AgentsService extends Service {
       });
 
       return profile;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     return result;
   }
@@ -55,6 +55,25 @@ export class AgentsService extends Service {
     return await this.prisma.agentProfile.update({
       where: { id: profile.id },
       data: updateDto,
+    });
+  }
+
+  async submitVerification(userId: string, dto: SubmitAgentVerificationDto) {
+    const profile = await this.getProfile(userId);
+    return await this.prisma.agentProfile.update({
+      where: { id: profile.id },
+      data: {
+        licenseUrl: dto.licenseUrl,
+        companyRegistrationUrl: dto.companyRegistrationUrl,
+        status: 'PENDING',
+      },
+    });
+  }
+
+  async verifyAgent(agentId: string, status: string) {
+    return await this.prisma.agentProfile.update({
+      where: { id: agentId },
+      data: { status },
     });
   }
 

@@ -44,11 +44,12 @@ describe('BookingsService', () => {
 
   describe('create', () => {
     const guestId = 'guest-1';
+    const now = Date.now();
     const baseBookingDto = {
       branchId: 'branch-1',
       roomId: 'room-1',
-      checkInDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-      checkOutDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days from now
+      checkInDate: new Date(now + 86400000).toISOString(), // Tomorrow
+      checkOutDate: new Date(now + 86400000 * 7).toISOString(), // 7 days from now (6 nights)
       guestsCount: 2,
     };
 
@@ -95,7 +96,7 @@ describe('BookingsService', () => {
       expect(mockPrismaService.booking.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            totalAmount: 200, // 2 nights * 100
+            totalAmount: 600, // 6 nights * 100
           }),
         }),
       );
@@ -129,7 +130,7 @@ describe('BookingsService', () => {
       expect(mockPrismaService.booking.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            totalAmount: 220, // 2 nights * 100 = 200 + 10% = 220
+            totalAmount: 660, // 6 nights * 100 = 600 + 10% = 660
           }),
         }),
       );

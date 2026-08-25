@@ -3,7 +3,7 @@ import { Service } from '@/common/domain/base.service';
 import { PrismaService } from '@/infra/database/prisma.service';
 import { InitiatePaymentDto } from '../dto/payments.dto';
 import { PaystackService } from './paystack.service';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import EventBus from '@/common/events/event-bus';
 
 @Injectable()
@@ -15,8 +15,8 @@ export class PaymentsService extends Service {
     super();
   }
 
-  async initiate(initiatePaymentDto: InitiatePaymentDto) {
-    const reference = `LODGIFY_${uuidv4()}`;
+  async initiatePayment(initiatePaymentDto: InitiatePaymentDto, userId: string) {
+    const reference = `PAY-${crypto.randomUUID()}`;
 
     // Save pending payment to DB
     const payment = await this.prisma.payment.create({

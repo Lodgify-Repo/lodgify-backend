@@ -11,12 +11,13 @@ export class PropertiesService extends Service {
     super();
   }
 
-  async create(createPropertyDto: CreatePropertyDto) {
+  async create(createPropertyDto: CreatePropertyDto, ownerId: string) {
     const { images, ...data } = createPropertyDto;
 
     return await this.prisma.property.create({
       data: {
         ...data,
+        ownerId,
         images: images ? {
           create: images.map(url => ({ url }))
         } : undefined,
@@ -55,6 +56,32 @@ export class PropertiesService extends Service {
         // For simplicity, we are not updating images here.
         // A robust implementation would handle adding/removing images separately.
       },
+    });
+  }
+
+  async submitOwnerVerification(userId: string, dto: any) {
+    return await this.prisma.propertyOwnerProfile.upsert({
+      where: { userId },
+      update: {
+        deedUrl: dto.deedUrl,
+        utilityBillUrl: dto.utilityBillUrl,
+        idUrl: dto.idUrl,
+        status: 'PENDING',
+      },
+      create: {
+        userId,
+        deedUrl: dto.deedUrl,
+        utilityBillUrl: dto.utilityBillUrl,
+        idUrl: dto.idUrl,
+        status: 'PENDING',
+      },
+    });
+  }
+
+  async verifyOwner(profileId: string, status: string) {
+    return await this.prisma.propertyOwnerProfile.update({
+      where: { id: profileId },
+      data: { status },
     });
   }
 }

@@ -39,7 +39,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    this.client.disconnect();
+    if (this.client) {
+      this.client.disconnect();
+    }
   }
 
   async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {

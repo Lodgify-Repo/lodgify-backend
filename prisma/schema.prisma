@@ -13,36 +13,45 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String
+  password  String?
   firstName String
   lastName  String
-  role      Role     @default(GUEST)
+  role      Role     @default(TRAVELER)
   phone     String?
   avatarUrl String?
   isActive  Boolean  @default(true)
+  googleId  String?  @unique
+  refreshToken String?
+  resetToken   String?
+  resetTokenExpires DateTime?
+  parentId  String?
+  parent    User?    @relation("SubAccounts", fields: [parentId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
   // Relations
+  subAccounts     User[]   @relation("SubAccounts")
   hotel           Hotel?
+  properties      Property[]
   bookings        Booking[]
   agentProfile    AgentProfile?
+  propertyOwnerProfile PropertyOwnerProfile?
   propertyReviews PropertyReview[]
   inquiries       PropertyInquiry[]
   offers          PurchaseOffer[]
   viewings        ViewingAppointment[]
+  sentInvitations SubAccountInvitation[] @relation("SentInvitations")
 }
 
 enum Role {
-  SUPER_ADMIN
+  ADMIN
   HOTEL_OWNER
-  HOTEL_MANAGER
-  FRONT_DESK
-  HOUSEKEEPING
-  RESTAURANT_STAFF
-  GUEST
+  BRANCH_MANAGER
+  TRAVELER
+  PROPERTY_OWNER
   AGENT
+  FOOD_SERVICE_MANAGER
 }
 
 // ---------------------------------------------------------
@@ -409,6 +418,8 @@ model Property {
   areaSqft        Int?
   status          String   @default("AVAILABLE") // AVAILABLE, SOLD, RENTED, OFFLINE
   features        String[]
+  ownerId         String
+  owner           User     @relation(fields: [ownerId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
@@ -465,6 +476,8 @@ model AgentProfile {
   user            User     @relation(fields: [userId], references: [id])
   agencyName      String?
   licenseNumber   String?
+  licenseUrl      String?
+  companyRegistrationUrl String?
   tier            String   @default("STANDARD") // STANDARD, PREMIUM
   commissionRate  Float    @default(5.0)
   totalSales      Float    @default(0)
@@ -603,4 +616,33 @@ model AuditLog {
   @@index([action])
   @@index([actorId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------
+// NEW MODELS: Verification & Invitations
+// ---------------------------------------------------------
+
+model PropertyOwnerProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  deedUrl         String?
+  utilityBillUrl  String?
+  idUrl           String?
+  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SubAccountInvitation {
+  id              String   @id @default(uuid())
+  senderId        String
+  sender          User     @relation("SentInvitations", fields: [senderId], references: [id])
+  email           String
+  role            Role
+  status          String   @default("PENDING") // PENDING, ACCEPTED, CANCELLED
+  token           String   @unique
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

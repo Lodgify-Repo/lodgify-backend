@@ -77,3 +77,17 @@ export class CreatePropertyDto {
 }
 
 export class UpdatePropertyDto extends CreatePropertyDto {}
+
+export class SubmitPropertyOwnerVerificationDto {
+  @ApiProperty({ description: 'GCS URL of the deed document' })
+  @IsString()
+  deedUrl: string;
+
+  @ApiProperty({ description: 'GCS URL of the utility bill document' })
+  @IsString()
+  utilityBillUrl: string;
+
+  @ApiProperty({ description: 'GCS URL of the ID document' })
+  @IsString()
+  idUrl: string;
+}

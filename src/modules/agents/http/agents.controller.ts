@@ -1,7 +1,7 @@
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { Controller, Post, Get, Body, UseGuards, Request, Patch } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request, Patch, Param } from '@nestjs/common';
 import { AgentsService } from '../services/agents.service';
-import { CreateAgentProfileDto, UpdateAgentProfileDto } from '../dto/agents.dto';
+import { CreateAgentProfileDto, UpdateAgentProfileDto, SubmitAgentVerificationDto } from '../dto/agents.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -40,5 +40,21 @@ export class AgentsController {
   @ApiOperation({ summary: 'Get all agents' })
   async getAllAgents() {
     return this.agentsService.getAllAgents();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.AGENT)
+  @Post('verify')
+  @ApiOperation({ summary: 'Submit verification documents' })
+  async submitVerification(@Request() req: any, @Body() dto: SubmitAgentVerificationDto) {
+    return this.agentsService.submitVerification(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Patch(':id/verify')
+  @ApiOperation({ summary: 'Approve or reject agent' })
+  async verifyAgent(@Param('id') id: string, @Body('status') status: string) {
+    return this.agentsService.verifyAgent(id, status);
   }
 }
