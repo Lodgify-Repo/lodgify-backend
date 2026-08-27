@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: #10b981; color: #fff; padding: 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .body { padding: 24px; color: #333; }
+    .detail { background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0; border-left: 4px solid #10b981; }
+    .label { font-weight: 600; color: #555; }
+    .footer { padding: 16px 24px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>New Commission Earned! 🎉</h1>
+    </div>
+    <div class="body">
+      <p>Hi <strong>{{agentName}}</strong>,</p>
+      <p>Congratulations! A transaction you referred has been completed successfully.</p>
+
+      <div class="detail">
+        <p><span class="label">Commission Amount:</span> ₦{{amount}}</p>
+        <p><span class="label">Reference:</span> {{reference}}</p>
+      </div>
+
+      <p>Your commission will be processed according to your payout schedule. Check your dashboard for more details.</p>
+    </div>
+    <div class="footer">
+      <p>© {{year}} Lodgify Agent Program.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: #3b82f6; color: #fff; padding: 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .body { padding: 24px; color: #333; }
+    .detail { background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0; text-align: center; font-size: 18px;}
+    .label { font-weight: 600; color: #555; }
+    .footer { padding: 16px 24px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Food Order Update 🛎️</h1>
+    </div>
+    <div class="body">
+      <p>Hi <strong>{{guestName}}</strong>,</p>
+      <p>There is an update on your food order at <strong>{{branchName}}</strong>.</p>
+
+      <div class="detail">
+        <p>Your order is now: <strong>{{status}}</strong></p>
+      </div>
+
+      <p>If you have any questions, please contact room service or the front desk.</p>
+    </div>
+    <div class="footer">
+      <p>© {{year}} Lodgify. Thank you for dining with us.</p>
+    </div>
+  </div>
+</body>
+</html>

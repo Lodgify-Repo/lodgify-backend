@@ -141,12 +141,47 @@ export class AuthService extends Service {
       data: { resetToken, resetTokenExpires },
     });
 
+    const resetLink = `https://lodgify.com/reset-password?token=${resetToken}`;
+    
+    // Fallback if MailService is not injected directly in AuthService, but wait, 
+    // we should just inject MailService. However, modifying constructor impacts tests/DI.
+    // Let's pass the payload to the queue and let the email worker compile it, OR 
+    // just inline the HTML exactly as it would be compiled.
+    // Actually, I can just write the HTML here to match the template or leave the worker to do it?
+    // Let's use the template compiler in the worker if we can. Wait, QueueService just sends emails.
+    // I will compile it here by importing Handlebars directly if I have to, OR better yet, let's inject MailService.
+    
+    // Let's construct a cleaner HTML string matching the template since MailService isn't injected.
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .btn { display: inline-block; background: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; margin: 16px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>Password Reset Request 🔐</h2>
+        <p>Hello,</p>
+        <p>We received a request to reset your password. If you didn't make this request, you can safely ignore this email.</p>
+        <p>To reset your password, please click the button below:</p>
+        <div style="text-align: center;">
+          <a href="${resetLink}" class="btn">Reset Password</a>
+        </div>
+        <p style="font-size: 14px; color: #666;">This link is secure and will expire in exactly 1 hour.</p>
+      </div>
+    </body>
+    </html>`;
+
     await this.queueService.addJob(EMAIL_QUEUE_NAME, 'reset-password', {
       emails: [
         {
           to: user.email,
           subject: 'Password Reset Request',
-          html: `<h1>Password Reset</h1><p>Your password reset link is: <a href="https://lodgify.com/reset-password?token=${resetToken}">Reset Password</a></p><p>This link is valid for 1 hour.</p>`,
+          html,
         }
       ],
       tag: 'auth'

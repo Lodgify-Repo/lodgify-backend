@@ -3,12 +3,16 @@ export interface AppEvents {
   'booking:cancelled': { bookingId: string; reason?: string };
   'room:status_changed': { roomId: string; status: string };
   'payment:received': { reference: string; amount: number; bookingId: string };
-  'food_order:new': { orderId: string; hotelId: string };
-  'food_order:status_updated': { orderId: string; status: string };
+  'food_order:created': { orderId: string };
+  'food_order:status_changed': { orderId: string; status: string };
+  'inventory:stock_updated': { itemId: string; newStock: number; reorderThreshold: number };
   'inventory:low_stock': { itemId: string; currentQuantity: number };
-  'property:inquiry': { propertyId: string; inquiryId: string };
+  'property:inquiry': { inquiryId: string };
+  'property:viewing_requested': { viewingId: string };
+  'property:offer_submitted': { offerId: string };
   'offer:received': { offerId: string; propertyId: string };
   'offer:responded': { offerId: string; status: string };
-  'agent:authorized': { agentId: string; propertyId: string };
-  'commission:confirmed': { commissionId: string; agentId: string };
+  'agent_auth:granted': { agentEmail: string; agentName: string; propertyName: string };
+  'agent_auth:revoked': { agentEmail: string; agentName: string; propertyName: string };
+  'commission:earned': { agentEmail: string; agentName: string; amount: number; reference: string };
 }

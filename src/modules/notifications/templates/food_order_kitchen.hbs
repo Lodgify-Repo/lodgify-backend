@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: #f59e0b; color: #fff; padding: 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .body { padding: 24px; color: #333; }
+    .detail { background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0; border-left: 4px solid #f59e0b; }
+    .detail p { margin: 4px 0; }
+    .label { font-weight: 600; color: #555; }
+    .footer { padding: 16px 24px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>New Food Order 🍽️</h1>
+    </div>
+    <div class="body">
+      <p>Hello Kitchen / Room Service,</p>
+      <p>A new food order has been placed.</p>
+
+      <div class="detail">
+        <p><span class="label">Order ID:</span> {{orderId}}</p>
+        <p><span class="label">Room Number:</span> {{roomNumber}}</p>
+        <p><span class="label">Items:</span> {{itemsList}}</p>
+        <p><span class="label">Total Amount:</span> ₦{{totalAmount}}</p>
+        {{#if notes}}
+        <p><span class="label">Notes:</span> {{notes}}</p>
+        {{/if}}
+      </div>
+
+      <p>Please prepare the order as soon as possible.</p>
+    </div>
+    <div class="footer">
+      <p>© {{year}} Lodgify. Automated Alert.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -5,7 +5,7 @@
   <style>
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
     .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .header { background: #2563eb; color: #fff; padding: 24px; text-align: center; }
+    .header { background: #10b981; color: #fff; padding: 24px; text-align: center; }
     .header h1 { margin: 0; font-size: 24px; }
     .body { padding: 24px; color: #333; }
     .detail { background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0; }
@@ -17,32 +17,33 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Booking Confirmed ✓</h1>
+      <h1>New Booking Alert 🔔</h1>
     </div>
     <div class="body">
-      <p>Hi <strong>{{guestName}}</strong>,</p>
-      <p>Your booking has been confirmed! Here are the details:</p>
+      <p>Hello Team,</p>
+      <p>A new booking has been confirmed for <strong>{{branchName}}</strong>.</p>
 
       <div class="detail">
         <p><span class="label">Booking Ref:</span> {{bookingId}}</p>
-        <p><span class="label">Hotel:</span> {{branchName}}</p>
+        <p><span class="label">Guest:</span> {{guestName}} ({{guestEmail}})</p>
         <p><span class="label">Check-in:</span> {{checkInDate}}</p>
         <p><span class="label">Check-out:</span> {{checkOutDate}}</p>
         {{#if roomNumber}}
-        <p><span class="label">Room:</span> {{roomNumber}}</p>
+        <p><span class="label">Assigned Room:</span> {{roomNumber}}</p>
         {{/if}}
-        <p><span class="label">Guests:</span> {{guestsCount}}</p>
-        <p><span class="label">Total:</span> ₦{{totalAmount}}</p>
+        <p><span class="label">Guests Count:</span> {{guestsCount}}</p>
+        <p><span class="label">Total Paid:</span> ₦{{totalAmount}}</p>
       </div>
 
       {{#if specialRequests}}
-      <p><span class="label">Special Requests:</span> {{specialRequests}}</p>
+      <p><span class="label">Special Requests:</span></p>
+      <p style="padding: 10px; background: #fff3cd; border-radius: 4px;">{{specialRequests}}</p>
       {{/if}}
 
-      <p>If you have any questions, please don't hesitate to contact us.</p>
+      <p>Please prepare for the guest's arrival.</p>
     </div>
     <div class="footer">
-      <p>© {{year}} Lodgify. All rights reserved.</p>
+      <p>© {{year}} Lodgify. Automated Alert.</p>
     </div>
   </div>
 </body>

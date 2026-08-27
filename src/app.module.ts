@@ -27,9 +27,12 @@ import { HealthModule } from './modules/health/health.module';
 
 import { envValidationSchema } from './common/config/env.validation';
 
+import { ScheduleModule } from '@nestjs/schedule';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validationSchema: envValidationSchema }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     CacheModule,
     MailModule,
