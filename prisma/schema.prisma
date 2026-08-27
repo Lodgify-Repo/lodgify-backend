@@ -145,11 +145,14 @@ model Room {
   roomNumber      String
   floor           String?
   status          RoomStatus @default(AVAILABLE)
+  features        String[]
+  images          String[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
 
   bookings        Booking[]
+  maintenanceBlocks RoomMaintenance[]
 
   @@unique([roomTypeId, roomNumber])
 }
@@ -160,6 +163,26 @@ enum RoomStatus {
   MAINTENANCE
   CLEANING
   OUT_OF_ORDER
+  BLOCKED
+}
+
+model RoomMaintenance {
+  id              String   @id @default(uuid())
+  roomId          String
+  room            Room     @relation(fields: [roomId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  status          MaintenanceStatus @default(SCHEDULED)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 model PricingRule {
@@ -191,6 +214,7 @@ model Booking {
   checkInDate     DateTime
   checkOutDate    DateTime
   guestsCount     Int
+  roomPrice       Float?
   totalAmount     Float
   status          BookingStatus @default(PENDING)
   specialRequests String?

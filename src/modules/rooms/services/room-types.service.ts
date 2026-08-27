@@ -59,4 +59,34 @@ export class RoomTypesService extends Service {
       },
     });
   }
+
+  async calculateDynamicPrice(roomTypeId: string, date: string) {
+    const roomType = await this.findOne(roomTypeId);
+    const targetDate = new Date(date);
+
+    const activeRules = await this.prisma.pricingRule.findMany({
+      where: {
+        roomTypeId,
+        isActive: true,
+        startDate: { lte: targetDate },
+        endDate: { gte: targetDate },
+      },
+    });
+
+    let currentPrice = roomType.basePrice;
+
+    for (const rule of activeRules) {
+      if (rule.modifierType === 'PERCENTAGE') {
+        currentPrice += roomType.basePrice * (rule.modifierValue / 100);
+      } else if (rule.modifierType === 'FIXED_AMOUNT') {
+        currentPrice += rule.modifierValue;
+      }
+    }
+
+    return {
+      basePrice: roomType.basePrice,
+      dynamicPrice: Math.max(0, currentPrice),
+      appliedRules: activeRules,
+    };
+  }
 }

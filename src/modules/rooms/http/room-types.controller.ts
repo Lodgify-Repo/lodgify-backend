@@ -1,5 +1,5 @@
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { Controller, Post, Get, Body, UseGuards, Param, Patch } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param, Patch, Query } from '@nestjs/common';
 import { RoomTypesService } from '../services/room-types.service';
 import { CreateRoomTypeDto, UpdateRoomTypeDto, CreatePricingRuleDto } from '../dto/rooms.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -40,5 +40,12 @@ export class RoomTypesController {
   @ApiOperation({ summary: 'Add pricing rule' })
   async addPricingRule(@Param('id') id: string, @Body() createPricingRuleDto: CreatePricingRuleDto) {
     return this.roomTypesService.addPricingRule(id, createPricingRuleDto);
+  }
+
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK, Role.TRAVELER)
+  @Get(':id/price')
+  @ApiOperation({ summary: 'Calculate dynamic price for a date' })
+  async getDynamicPrice(@Param('id') id: string, @Query('date') date: string) {
+    return this.roomTypesService.calculateDynamicPrice(id, date);
   }
 }

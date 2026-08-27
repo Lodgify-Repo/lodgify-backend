@@ -1,7 +1,7 @@
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { Controller, Post, Get, Body, UseGuards, Param, Patch } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param, Patch, Query } from '@nestjs/common';
 import { RoomsService } from '../services/rooms.service';
-import { CreateRoomDto, UpdateRoomDto } from '../dto/rooms.dto';
+import { CreateRoomDto, UpdateRoomDto, UpdateRoomStatusDto, CreateRoomMaintenanceDto } from '../dto/rooms.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -33,5 +33,37 @@ export class RoomsController {
   @ApiOperation({ summary: 'Update' })
   async update(@Param('id') id: string, @Body() updateRoomDto: UpdateRoomDto) {
     return this.roomsService.update(id, updateRoomDto);
+  }
+
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING)
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update room status' })
+  async updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateRoomStatusDto) {
+    return this.roomsService.updateStatus(id, updateStatusDto);
+  }
+
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
+  @Post(':id/maintenance')
+  @ApiOperation({ summary: 'Schedule maintenance' })
+  async scheduleMaintenance(@Param('id') id: string, @Body() dto: CreateRoomMaintenanceDto) {
+    return this.roomsService.scheduleMaintenance(id, dto);
+  }
+
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING)
+  @Get(':id/maintenance')
+  @ApiOperation({ summary: 'Get room maintenance history' })
+  async getRoomMaintenance(@Param('id') id: string) {
+    return this.roomsService.getRoomMaintenance(id);
+  }
+
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK)
+  @Get('calendar/availability')
+  @ApiOperation({ summary: 'Get availability calendar' })
+  async getAvailabilityCalendar(
+    @Param('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.roomsService.getAvailabilityCalendar(branchId, startDate, endDate);
   }
 }

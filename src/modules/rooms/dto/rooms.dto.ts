@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsArray, IsEnum, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, IsEnum, IsDateString, IsBoolean, ArrayMaxSize } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoomStatus } from '@prisma/client';
 
@@ -58,13 +58,47 @@ export class CreateRoomDto {
   @IsString()
   floor?: string;
 
-  @ApiPropertyOptional({ description: 'Room status', enum: ['AVAILABLE', 'OCCUPIED', 'MAINTENANCE', 'RESERVED'] })
+  @ApiPropertyOptional({ description: 'Room status', enum: RoomStatus })
   @IsOptional()
   @IsEnum(RoomStatus)
   status?: RoomStatus;
+
+  @ApiPropertyOptional({ description: 'Special features of the room', example: ['Corner room', 'Near elevator'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  features?: string[];
+
+  @ApiPropertyOptional({ description: 'Room images (max 10)', example: ['image1.jpg'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(10)
+  images?: string[];
 }
 
 export class UpdateRoomDto extends CreateRoomDto {}
+
+export class UpdateRoomStatusDto {
+  @ApiProperty({ description: 'New room status', enum: RoomStatus })
+  @IsEnum(RoomStatus)
+  status: RoomStatus;
+}
+
+export class CreateRoomMaintenanceDto {
+  @ApiProperty({ description: 'Start date of maintenance' })
+  @IsDateString()
+  startDate: string;
+
+  @ApiProperty({ description: 'End date of maintenance' })
+  @IsDateString()
+  endDate: string;
+
+  @ApiPropertyOptional({ description: 'Reason for maintenance' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
 
 export class CreatePricingRuleDto {
   @ApiProperty({ description: 'Pricing rule name', example: 'Christmas Special' })
