@@ -2,6 +2,7 @@ export interface AppEvents {
   'booking:confirmed': { bookingId: string; hotelId: string };
   'booking:cancelled': { bookingId: string; reason?: string };
   'room:status_changed': { roomId: string; status: string };
+  'room:cleaned': { roomId: string; branchId: string; roomTypeId: string; userId: string };
   'payment:received': { reference: string; amount: number; bookingId: string };
   'food_order:created': { orderId: string };
   'food_order:status_changed': { orderId: string; status: string };

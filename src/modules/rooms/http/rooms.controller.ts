@@ -1,5 +1,5 @@
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { Controller, Post, Get, Body, UseGuards, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param, Patch, Query, Request } from '@nestjs/common';
 import { RoomsService } from '../services/rooms.service';
 import { CreateRoomDto, UpdateRoomDto, UpdateRoomStatusDto, CreateRoomMaintenanceDto } from '../dto/rooms.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -38,8 +38,8 @@ export class RoomsController {
   @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update room status' })
-  async updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateRoomStatusDto) {
-    return this.roomsService.updateStatus(id, updateStatusDto);
+  async updateStatus(@Request() req: any, @Param('id') id: string, @Body() updateStatusDto: UpdateRoomStatusDto) {
+    return this.roomsService.updateStatus(id, updateStatusDto, req.user?.id);
   }
 
   @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)

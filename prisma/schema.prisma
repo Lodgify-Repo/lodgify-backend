@@ -83,6 +83,7 @@ model Hotel {
   deletedAt       DateTime?
 
   branches        Branch[]
+  inventoryCategories InventoryCategory[]
 }
 
 model Branch {
@@ -113,6 +114,12 @@ model Branch {
   purchaseOrders  PurchaseOrder[]
   menuCategories  MenuCategory[]
   foodOrders      FoodOrder[]
+
+  storageLocations StorageLocation[]
+  stockCounts      StockCount[]
+  transfersFrom    StockTransfer[] @relation("TransferFrom")
+  transfersTo      StockTransfer[] @relation("TransferTo")
+  inventoryAlertConfig InventoryAlertConfig?
 }
 
 // ---------------------------------------------------------
@@ -136,6 +143,7 @@ model RoomType {
 
   rooms           Room[]
   pricingRules    PricingRule[]
+  inventoryLinks  RoomTypeInventoryLink[]
 }
 
 model Room {
@@ -153,6 +161,7 @@ model Room {
 
   bookings        Booking[]
   maintenanceBlocks RoomMaintenance[]
+  inventoryTransactions InventoryTransaction[]
 
   @@unique([roomTypeId, roomNumber])
 }
@@ -176,6 +185,8 @@ model RoomMaintenance {
   status          MaintenanceStatus @default(SCHEDULED)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  inventoryTransactions InventoryTransaction[]
 }
 
 enum MaintenanceStatus {
@@ -261,6 +272,8 @@ enum PaymentStatus {
 // ---------------------------------------------------------
 model InventoryCategory {
   id              String   @id @default(uuid())
+  hotelId         String?
+  hotel           Hotel?   @relation(fields: [hotelId], references: [id])
   name            String
   description     String?
   createdAt       DateTime @default(now())
@@ -276,9 +289,14 @@ model InventoryItem {
   categoryId      String
   category        InventoryCategory @relation(fields: [categoryId], references: [id])
   name            String
+  description     String?
   sku             String?
+  barcode         String?
+  defaultSupplierId String?
+  defaultSupplier Supplier? @relation(fields: [defaultSupplierId], references: [id])
+  photos          String[]
   unit            String   // kg, pcs, liters
-  quantity        Float    @default(0)
+  quantity        Float    @default(0) // total quantity across all locations
   minThreshold    Float
   reorderQuantity Float?
   costPerUnit     Float?
@@ -286,9 +304,13 @@ model InventoryItem {
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
 
+  balances        StockBalance[]
   transactions    InventoryTransaction[]
   poItems         PurchaseOrderItem[]
   recipeItems     MenuItemRecipe[]
+  transferItems   StockTransferItem[]
+  countItems      StockCountItem[]
+  roomTypeLinks   RoomTypeInventoryLink[]
 }
 
 model InventoryTransaction {
@@ -299,6 +321,20 @@ model InventoryTransaction {
   quantity        Float
   remarks         String?
   userId          String   // staff who made the transaction
+
+  locationId      String?
+  location        StorageLocation? @relation(fields: [locationId], references: [id])
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  batchNumber     String?
+  expiryDate      DateTime?
+  roomId          String?
+  room            Room? @relation(fields: [roomId], references: [id])
+  foodOrderId     String?
+  foodOrder       FoodOrder? @relation(fields: [foodOrderId], references: [id])
+  maintenanceId   String?
+  maintenance     RoomMaintenance? @relation(fields: [maintenanceId], references: [id])
+
   createdAt       DateTime @default(now())
 }
 
@@ -315,11 +351,14 @@ model Supplier {
   email           String?
   phone           String?
   address         String?
+  suppliedItems   String[] // item categories/names this supplier provides
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
 
   purchaseOrders  PurchaseOrder[]
+  inventoryItems  InventoryItem[]
+  ratings         SupplierRating[]
 }
 
 model PurchaseOrder {
@@ -336,6 +375,7 @@ model PurchaseOrder {
   deletedAt       DateTime?
 
   items           PurchaseOrderItem[]
+  inventoryTransactions InventoryTransaction[]
 }
 
 enum POStatus {
@@ -355,6 +395,114 @@ model PurchaseOrderItem {
   quantity        Float
   unitPrice       Float
   total           Float
+}
+
+model StorageLocation {
+  id        String   @id @default(uuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  name      String
+  type      String   // MAIN_STORAGE, FLOOR_PANTRY, KITCHEN
+  createdAt DateTime @default(now())
+
+  balances  StockBalance[]
+  transactions InventoryTransaction[]
+}
+
+model StockBalance {
+  id              String   @id @default(uuid())
+  locationId      String
+  location        StorageLocation @relation(fields: [locationId], references: [id])
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  quantity        Float    @default(0)
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([locationId, itemId])
+}
+
+model InventoryAlertConfig {
+  id              String   @id @default(uuid())
+  branchId        String   @unique
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  emailRecipients String[]
+  notifyInApp     Boolean  @default(true)
+}
+
+model StockTransfer {
+  id              String   @id @default(uuid())
+  fromBranchId    String
+  fromBranch      Branch   @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranchId      String
+  toBranch        Branch   @relation("TransferTo", fields: [toBranchId], references: [id])
+  status          String   @default("PENDING") // PENDING, APPROVED, IN_TRANSIT, RECEIVED, REJECTED
+  requestedBy     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           StockTransferItem[]
+}
+
+model StockTransferItem {
+  id              String   @id @default(uuid())
+  transferId      String
+  transfer        StockTransfer @relation(fields: [transferId], references: [id])
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  quantity        Float
+}
+
+model SupplierRating {
+  id              String   @id @default(uuid())
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  rating          Int      // 1-5 stars
+  deliveryRating  Int?     // 1-5 reliability rating
+  qualityRating   Int?     // 1-5 quality rating
+  comment         String?
+  ratedBy         String   // userId
+  createdAt       DateTime @default(now())
+}
+
+model StockCount {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  status          String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  initiatedBy     String   // userId
+  completedAt     DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           StockCountItem[]
+}
+
+model StockCountItem {
+  id              String     @id @default(uuid())
+  stockCountId    String
+  stockCount      StockCount @relation(fields: [stockCountId], references: [id])
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  systemQuantity  Float      // snapshot of system qty at count initiation
+  actualQuantity  Float?     // physically counted qty
+  variance        Float?     // actual - system
+  status          String     @default("PENDING") // PENDING, COUNTED, ADJUSTED, FLAGGED
+  adjustedAt      DateTime?
+  notes           String?
+}
+
+model RoomTypeInventoryLink {
+  id              String    @id @default(uuid())
+  roomTypeId      String
+  roomType        RoomType  @relation(fields: [roomTypeId], references: [id])
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  quantityPerClean Float    // e.g., 2 shampoo bottles per cleaning
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([roomTypeId, itemId])
 }
 
 // ---------------------------------------------------------
@@ -413,6 +561,7 @@ model FoodOrder {
   updatedAt       DateTime @updatedAt
 
   items           FoodOrderItem[]
+  inventoryTransactions InventoryTransaction[]
 }
 
 enum FoodOrderStatus {

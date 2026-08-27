@@ -16,6 +16,21 @@ export class CreateInventoryItemDto {
   @IsString()
   sku?: string;
 
+  @ApiPropertyOptional({ description: 'Barcode of the item' })
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @ApiPropertyOptional({ description: 'Default supplier ID' })
+  @IsOptional()
+  @IsString()
+  defaultSupplierId?: string;
+
+  @ApiPropertyOptional({ description: 'Array of photo URLs' })
+  @IsOptional()
+  @IsString({ each: true })
+  photos?: string[];
+
   @ApiProperty({ description: 'Unit of measurement', example: 'pieces' })
   @IsString()
   unit: string;
@@ -48,4 +63,39 @@ export class InventoryTransactionDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @ApiPropertyOptional({ description: 'Storage location ID' })
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @ApiPropertyOptional({ description: 'Linked purchase order ID' })
+  @IsOptional()
+  @IsString()
+  purchaseOrderId?: string;
+
+  @ApiPropertyOptional({ description: 'Batch number' })
+  @IsOptional()
+  @IsString()
+  batchNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Expiry date' })
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
+
+  @ApiPropertyOptional({ description: 'Linked room ID for consumption' })
+  @IsOptional()
+  @IsString()
+  roomId?: string;
+
+  @ApiPropertyOptional({ description: 'Linked food order ID for consumption' })
+  @IsOptional()
+  @IsString()
+  foodOrderId?: string;
+
+  @ApiPropertyOptional({ description: 'Linked maintenance task ID for consumption' })
+  @IsOptional()
+  @IsString()
+  maintenanceId?: string;
 }

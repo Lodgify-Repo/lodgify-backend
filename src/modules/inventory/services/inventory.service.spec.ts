@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { InventoryService } from './inventory.service';
+import { InventoryTransactionsService } from './inventory-transactions.service';
 import { PrismaService } from '@/infra/database/prisma.service';
 import { DomainError } from '@/common/domain/error';
 import { InventoryErrorCodes } from '../errors';
@@ -10,24 +10,25 @@ jest.mock('@/common/events/event-bus', () => ({
   on: jest.fn(),
 }));
 
-describe('InventoryService', () => {
-  let service: InventoryService;
+describe('InventoryTransactionsService', () => {
+  let service: InventoryTransactionsService;
 
   const mockPrismaService = {
     inventoryItem: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
+    stockBalance: { findUnique: jest.fn(), upsert: jest.fn() },
     $transaction: jest.fn(async (callback) => callback(mockPrismaService)),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        InventoryService,
+        InventoryTransactionsService,
         { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
-    service = module.get<InventoryService>(InventoryService);
+    service = module.get<InventoryTransactionsService>(InventoryTransactionsService);
   });
 
   afterEach(() => {
@@ -67,7 +68,7 @@ describe('InventoryService', () => {
         where: { id: itemId },
         data: { quantity: 4 },
       });
-      expect(EventBus.emit).toHaveBeenCalledWith('inventory:low_stock', { itemId, currentQuantity: 4 }, 'InventoryService');
+      expect(EventBus.emit).toHaveBeenCalledWith('inventory:low_stock', { itemId, currentQuantity: 4 }, 'InventoryTransactionsService');
     });
 
     it('should add stock for IN transactions', async () => {

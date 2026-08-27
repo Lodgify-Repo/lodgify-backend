@@ -1,33 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { Service } from '@/common/domain/base.service';
 import { PrismaService } from '@/infra/database/prisma.service';
-import { CreateInventoryItemDto, InventoryTransactionDto } from '../dto/inventory.dto';
+import { InventoryTransactionDto } from '../dto/inventory.dto';
 import { DomainError } from '@/common/domain/error';
 import { InventoryErrorCodes } from '../errors';
 import EventBus from '@/common/events/event-bus';
 
 @Injectable()
-export class InventoryService extends Service {
+export class InventoryTransactionsService extends Service {
   constructor(private readonly prisma: PrismaService) {
     super();
   }
 
-  async createItem(branchId: string, createDto: CreateInventoryItemDto) {
-    return await this.prisma.inventoryItem.create({
-      data: {
-        ...createDto,
-        branchId,
-      },
-    });
-  }
-
-  async getItemsByBranch(branchId: string) {
-    return await this.prisma.inventoryItem.findMany({
-      where: { branchId },
-      include: { category: true },
-    });
-  }
-
+  // -----------------------------------------
+  // F-I04 & F-I05 Goods Receipt & Consumption
+  // -----------------------------------------
   async recordTransaction(itemId: string, userId: string, dto: InventoryTransactionDto) {
     const item = await this.prisma.inventoryItem.findUnique({ where: { id: itemId } });
     if (!item) {
@@ -38,8 +25,6 @@ export class InventoryService extends Service {
       throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK);
     }
 
-    // IN / ADJUSTMENT = add to current stock (ADJUSTMENT can have positive or negative quantity)
-    // OUT = subtract from current stock
     const updatedQuantity =
       dto.type === 'IN' || dto.type === 'ADJUSTMENT'
         ? item.quantity + dto.quantity
@@ -52,6 +37,7 @@ export class InventoryService extends Service {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Create the transaction record
       const transaction = await tx.inventoryTransaction.create({
         data: {
           itemId,
@@ -59,13 +45,43 @@ export class InventoryService extends Service {
           quantity: dto.quantity,
           remarks: dto.remarks,
           userId,
+          locationId: dto.locationId,
+          purchaseOrderId: dto.purchaseOrderId,
+          batchNumber: dto.batchNumber,
+          expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+          roomId: dto.roomId,
+          foodOrderId: dto.foodOrderId,
+          maintenanceId: dto.maintenanceId,
         },
       });
 
+      // 2. Update global item quantity
       const updatedItem = await tx.inventoryItem.update({
         where: { id: itemId },
         data: { quantity: updatedQuantity },
       });
+
+      // 3. Update location-specific balance if location is provided
+      if (dto.locationId) {
+        const balance = await tx.stockBalance.findUnique({
+          where: { locationId_itemId: { locationId: dto.locationId, itemId } }
+        });
+
+        const newBalanceQty =
+          dto.type === 'IN' || dto.type === 'ADJUSTMENT'
+            ? (balance?.quantity || 0) + dto.quantity
+            : (balance?.quantity || 0) - dto.quantity;
+
+        if (newBalanceQty < 0) {
+          throw new DomainError(InventoryErrorCodes.INSUFFICIENT_STOCK, 'Location has insufficient stock');
+        }
+
+        await tx.stockBalance.upsert({
+          where: { locationId_itemId: { locationId: dto.locationId, itemId } },
+          update: { quantity: newBalanceQty },
+          create: { locationId: dto.locationId, itemId, quantity: newBalanceQty },
+        });
+      }
 
       return { transaction, updatedItem };
     });
@@ -74,7 +90,7 @@ export class InventoryService extends Service {
       EventBus.emit(
         'inventory:low_stock',
         { itemId, currentQuantity: result.updatedItem.quantity },
-        'InventoryService',
+        'InventoryTransactionsService',
       );
     }
 

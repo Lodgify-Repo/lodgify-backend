@@ -4,6 +4,7 @@ import { PrismaService } from '@/infra/database/prisma.service';
 import { CreateRoomDto, UpdateRoomDto, UpdateRoomStatusDto, CreateRoomMaintenanceDto } from '../dto/rooms.dto';
 import { DomainError } from '@/common/domain/error';
 import { RoomErrorCodes } from '../errors';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class RoomsService extends Service {
@@ -51,16 +52,32 @@ export class RoomsService extends Service {
     });
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateRoomStatusDto) {
-    const room = await this.prisma.room.findUnique({ where: { id } });
+  async updateStatus(id: string, updateStatusDto: UpdateRoomStatusDto, userId?: string) {
+    const room = await this.prisma.room.findUnique({ 
+      where: { id },
+      include: { roomType: true }
+    });
+    
     if (!room) {
       throw new DomainError(RoomErrorCodes.ROOM_NOT_FOUND);
     }
 
-    return await this.prisma.room.update({
+    const updated = await this.prisma.room.update({
       where: { id },
       data: { status: updateStatusDto.status },
     });
+
+    // F-I12: If status changes to AVAILABLE (from CLEANING), emit event
+    if (updateStatusDto.status === 'AVAILABLE' && room.status === 'CLEANING') {
+      EventBus.emit('room:cleaned', {
+        roomId: room.id,
+        branchId: room.roomType.branchId,
+        roomTypeId: room.roomTypeId,
+        userId: userId || 'system',
+      }, 'RoomsService');
+    }
+
+    return updated;
   }
 
   async scheduleMaintenance(id: string, dto: CreateRoomMaintenanceDto) {
