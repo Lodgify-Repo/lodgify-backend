@@ -14,14 +14,14 @@ import { Role } from '@prisma/client';
 export class ViewingsController {
   constructor(private readonly viewingsService: ViewingsService) {}
 
-  @Roles(Role.GUEST)
+  @Roles(Role.TRAVELER)
   @Post()
   @ApiOperation({ summary: 'Schedule' })
   async schedule(@Request() req: any, @Body() scheduleDto: ScheduleViewingDto) {
     return this.viewingsService.schedule(req.user.id, scheduleDto);
   }
 
-  @Roles(Role.GUEST)
+  @Roles(Role.TRAVELER)
   @Get('my-viewings')
   @ApiOperation({ summary: 'Get my viewings' })
   async getMyViewings(@Request() req: any) {

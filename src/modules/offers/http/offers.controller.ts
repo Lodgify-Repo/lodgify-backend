@@ -14,14 +14,14 @@ import { Role } from '@prisma/client';
 export class OffersController {
   constructor(private readonly offersService: OffersService) {}
 
-  @Roles(Role.GUEST) // In this context, any authenticated user can make an offer
+  @Roles(Role.TRAVELER) // In this context, any authenticated user can make an offer
   @Post()
   @ApiOperation({ summary: 'Create' })
   async create(@Request() req: any, @Body() createOfferDto: CreateOfferDto) {
     return this.offersService.create(req.user.id, createOfferDto);
   }
 
-  @Roles(Role.GUEST)
+  @Roles(Role.TRAVELER)
   @Get('my-offers')
   @ApiOperation({ summary: 'Get my offers' })
   async getMyOffers(@Request() req: any) {

@@ -28,6 +28,11 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   specialRequests?: string;
+
+  @ApiPropertyOptional({ description: 'Booking source', example: 'WEB' })
+  @IsOptional()
+  @IsEnum(['WEB', 'PHONE', 'WALK_IN', 'OTA', 'CORP', 'OTHER'])
+  source?: string;
 }
 
 export class UpdateBookingStatusDto {

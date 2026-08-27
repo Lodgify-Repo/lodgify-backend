@@ -16,22 +16,23 @@ export class HotelsController {
 
   @Roles(Role.HOTEL_OWNER)
   @Post()
-  @ApiOperation({ summary: 'Create' })
+  @ApiOperation({ summary: 'Register a new hotel — requires admin approval (F-H01)' })
   async create(@Request() req: any, @Body() createHotelDto: CreateHotelDto) {
     return this.hotelsService.create(req.user.id, createHotelDto);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Get('my-hotel')
-  @ApiOperation({ summary: 'Get my hotel' })
+  @ApiOperation({ summary: 'Get my hotel with branches' })
   async getMyHotel(@Request() req: any) {
     return this.hotelsService.findByOwner(req.user.id);
   }
 
   @Roles(Role.HOTEL_OWNER)
   @Patch('my-hotel')
-  @ApiOperation({ summary: 'Update my hotel' })
+  @ApiOperation({ summary: 'Update my hotel details' })
   async updateMyHotel(@Request() req: any, @Body() updateHotelDto: UpdateHotelDto) {
     return this.hotelsService.update(req.user.id, updateHotelDto);
   }
 }
+

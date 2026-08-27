@@ -14,28 +14,28 @@ import { Role } from '@prisma/client';
 export class RoomTypesController {
   constructor(private readonly roomTypesService: RoomTypesService) {}
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Post()
   @ApiOperation({ summary: 'Create' })
   async create(@Param('branchId') branchId: string, @Body() createRoomTypeDto: CreateRoomTypeDto) {
     return this.roomTypesService.create(branchId, createRoomTypeDto);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK)
   @Get()
   @ApiOperation({ summary: 'Find all' })
   async findAll(@Param('branchId') branchId: string) {
     return this.roomTypesService.findAll(branchId);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Patch(':id')
   @ApiOperation({ summary: 'Update' })
   async update(@Param('id') id: string, @Body() updateRoomTypeDto: UpdateRoomTypeDto) {
     return this.roomTypesService.update(id, updateRoomTypeDto);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Post(':id/pricing-rules')
   @ApiOperation({ summary: 'Add pricing rule' })
   async addPricingRule(@Param('id') id: string, @Body() createPricingRuleDto: CreatePricingRuleDto) {

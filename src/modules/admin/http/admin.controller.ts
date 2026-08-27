@@ -1,7 +1,7 @@
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { Controller, Get, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { AdminService } from '../services/admin.service';
-import { UpdateUserStatusDto, VerifyAgentDto } from '../dto/admin.dto';
+import { UpdateUserStatusDto, VerifyAgentDto, VerifyHotelDto } from '../dto/admin.dto';
 import { SystemLogsQueryDto, ClearLogsDto } from '../dto/system-logs.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
@@ -12,7 +12,7 @@ import { Role } from '@prisma/client';
 @ApiBearerAuth('access-token')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPER_ADMIN)
+@Roles(Role.ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -40,6 +40,32 @@ export class AdminController {
     return this.adminService.verifyAgent(id, dto);
   }
 
+  // ---------------------------------------------------------
+  // Hotel Verification (F-H04)
+  // ---------------------------------------------------------
+
+  @Get('hotels/pending')
+  @ApiOperation({ summary: 'List hotels awaiting verification (F-H04)' })
+  async getPendingHotels() {
+    return this.adminService.getPendingHotels();
+  }
+
+  @Get('hotels/:id')
+  @ApiOperation({ summary: 'Review hotel details — documents, owner info, branches (F-H04)' })
+  async getHotelForReview(@Param('id') id: string) {
+    return this.adminService.getHotelForReview(id);
+  }
+
+  @Patch('hotels/:id/verify')
+  @ApiOperation({ summary: 'Approve or reject a hotel registration (F-H04)' })
+  async verifyHotel(@Param('id') id: string, @Body() dto: VerifyHotelDto, @Request() req: any) {
+    return this.adminService.verifyHotel(id, dto, req.user.id);
+  }
+
+  // ---------------------------------------------------------
+  // System Logs
+  // ---------------------------------------------------------
+
   @Get('logs')
   @ApiOperation({ summary: 'Get system logs' })
   async getSystemLogs(@Query() dto: SystemLogsQueryDto) {
@@ -52,4 +78,3 @@ export class AdminController {
     return this.adminService.clearAuditLogs(dto);
   }
 }
-

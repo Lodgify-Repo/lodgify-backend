@@ -16,11 +16,11 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.GUEST, Role.FRONT_DESK)
+  @Roles(Role.TRAVELER, Role.FRONT_DESK)
   @Post('initiate')
   @ApiOperation({ summary: 'Initiate' })
-  async initiate(@Body() initiatePaymentDto: InitiatePaymentDto) {
-    return this.paymentsService.initiate(initiatePaymentDto);
+  async initiate(@Req() req: any, @Body() initiatePaymentDto: InitiatePaymentDto) {
+    return this.paymentsService.initiatePayment(initiatePaymentDto, req.user.id);
   }
 
   @Post('webhook')

@@ -17,3 +17,18 @@ export class VerifyAgentDto {
   @IsEnum(['VERIFIED', 'REJECTED'])
   status: 'VERIFIED' | 'REJECTED';
 }
+
+export class VerifyHotelDto {
+  @ApiProperty({ description: 'Hotel verification decision', enum: ['APPROVED', 'REJECTED'] })
+  @IsEnum(['APPROVED', 'REJECTED'])
+  status: 'APPROVED' | 'REJECTED';
+
+  @ApiPropertyOptional({
+    description: 'Admin notes on the verification decision',
+    example: 'All documents verified. Business registration confirmed.',
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+

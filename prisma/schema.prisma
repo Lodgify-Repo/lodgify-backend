@@ -45,13 +45,17 @@ model User {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   HOTEL_OWNER
   BRANCH_MANAGER
+  FRONT_DESK
+  HOUSEKEEPING
+  RESTAURANT_STAFF
+  FOOD_SERVICE_MANAGER
   TRAVELER
   PROPERTY_OWNER
   AGENT
-  FOOD_SERVICE_MANAGER
 }
 
 // ---------------------------------------------------------
@@ -66,7 +70,14 @@ model Hotel {
   registrationNo  String?
   taxId           String?
   logoUrl         String?
-  status          String   @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  starRating      Int?     // 1-5 star classification
+  contactEmail    String?
+  contactPhone    String?
+  status          String   @default("PENDING") // PENDING, ACTIVE, REJECTED, SUSPENDED
+  verificationDocuments String[] // URLs of uploaded verification documents
+  verificationNotes     String?  // Admin notes on verification decision
+  verifiedAt      DateTime?
+  verifiedBy      String?  // Admin user ID who verified
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
@@ -87,7 +98,11 @@ model Branch {
   longitude       Float?
   contactEmail    String
   contactPhone    String
-  status          String   @default("ACTIVE")
+  photos          String[] // Branch photo URLs
+  amenities       String[] // e.g. ["WIFI", "POOL", "GYM", "PARKING", "SPA"]
+  policies        Json?    // Flexible JSON: check-in/out times, cancellation, pet policy, etc.
+  foodServiceEnabled Boolean @default(false)
+  status          String   @default("ACTIVE") // ACTIVE, DEACTIVATED, OFFLINE
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
@@ -593,6 +608,10 @@ enum AuditLogAction {
   ROOM_UPDATED
   HOTEL_CREATED
   HOTEL_UPDATED
+  HOTEL_APPROVED
+  HOTEL_REJECTED
+  BRANCH_DEACTIVATED
+  BRANCH_REACTIVATED
   SYSTEM_STARTUP
   SYSTEM_ERROR
   CONFIG_CHANGED

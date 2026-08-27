@@ -14,21 +14,21 @@ import { Role } from '@prisma/client';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Post('items')
-  @ApiOperation({ summary: 'Create item' })
+  @ApiOperation({ summary: 'Create inventory item' })
   async createItem(@Param('branchId') branchId: string, @Body() createDto: CreateInventoryItemDto) {
     return this.inventoryService.createItem(branchId, createDto);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
   @Get('items')
   @ApiOperation({ summary: 'Get items' })
   async getItems(@Param('branchId') branchId: string) {
     return this.inventoryService.getItemsByBranch(branchId);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.HOUSEKEEPING, Role.RESTAURANT_STAFF)
   @Post('items/:itemId/transactions')
   @ApiOperation({ summary: 'Record transaction' })
   async recordTransaction(

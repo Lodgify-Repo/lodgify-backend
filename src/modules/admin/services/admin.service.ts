@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Service } from '@/common/domain/base.service';
 import { PrismaService } from '@/infra/database/prisma.service';
-import { UpdateUserStatusDto, VerifyAgentDto } from '../dto/admin.dto';
+import { UpdateUserStatusDto, VerifyAgentDto, VerifyHotelDto } from '../dto/admin.dto';
 import { SystemLogsQueryDto, ClearLogsDto } from '../dto/system-logs.dto';
 import { DomainError } from '@/common/domain/error';
 import { AdminErrorCodes } from '../errors';
@@ -64,6 +64,79 @@ export class AdminService extends Service {
       where: { id: agentProfileId },
       data: { status: dto.status },
     });
+  }
+
+  // ---------------------------------------------------------
+  // Hotel Verification (F-H04)
+  // ---------------------------------------------------------
+
+  /**
+   * List all hotels awaiting admin verification.
+   */
+  async getPendingHotels() {
+    return await this.prisma.hotel.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        owner: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Get full hotel details for admin review — includes owner info, branches,
+   * and uploaded verification documents.
+   */
+  async getHotelForReview(hotelId: string) {
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      include: {
+        owner: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
+        branches: true,
+      },
+    });
+
+    if (!hotel) {
+      throw new DomainError(AdminErrorCodes.TARGET_NOT_FOUND, 'Hotel not found');
+    }
+
+    return hotel;
+  }
+
+  /**
+   * Approve or reject a hotel registration (F-H04).
+   * Sets the hotel status, records verification metadata, and writes an audit log.
+   */
+  async verifyHotel(hotelId: string, dto: VerifyHotelDto, adminUserId: string) {
+    const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
+    if (!hotel) {
+      throw new DomainError(AdminErrorCodes.TARGET_NOT_FOUND, 'Hotel not found');
+    }
+
+    const newStatus = dto.status === 'APPROVED' ? 'ACTIVE' : 'REJECTED';
+
+    const updated = await this.prisma.hotel.update({
+      where: { id: hotelId },
+      data: {
+        status: newStatus,
+        verificationNotes: dto.notes ?? null,
+        verifiedAt: new Date(),
+        verifiedBy: adminUserId,
+      },
+    });
+
+    // Write audit log
+    await this.writeAuditLog({
+      action: dto.status === 'APPROVED' ? AuditLogAction.HOTEL_APPROVED : AuditLogAction.HOTEL_REJECTED,
+      message: `Hotel "${hotel.name}" (${hotelId}) ${dto.status.toLowerCase()} by admin ${adminUserId}`,
+      level: AuditLogLevel.INFO,
+      actorId: adminUserId,
+      targetType: 'Hotel',
+      targetId: hotelId,
+      metadata: { previousStatus: hotel.status, newStatus, notes: dto.notes },
+    });
+
+    return updated;
   }
 
   // System Logs — Audit Log queries + file-based log tailing

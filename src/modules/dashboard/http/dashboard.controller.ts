@@ -20,7 +20,7 @@ export class DashboardController {
     return this.dashboardService.getAdminStats();
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER)
   @Get('hotel/stats')
   @ApiOperation({ summary: 'Get hotel stats' })
   async getHotelStats(@Request() req: any) {

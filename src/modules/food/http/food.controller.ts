@@ -14,28 +14,28 @@ import { Role } from '@prisma/client';
 export class FoodController {
   constructor(private readonly foodService: FoodService) {}
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.RESTAURANT_STAFF)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.RESTAURANT_STAFF)
   @Post('menu')
   @ApiOperation({ summary: 'Create menu item' })
   async createMenuItem(@Body() createDto: CreateMenuItemDto) {
     return this.foodService.createMenuItem(createDto);
   }
 
-  @Roles(Role.GUEST, Role.FRONT_DESK, Role.RESTAURANT_STAFF)
+  @Roles(Role.TRAVELER, Role.FRONT_DESK, Role.RESTAURANT_STAFF)
   @Get('categories/:categoryId/menu')
-  @ApiOperation({ summary: 'Get menu' })
+  @ApiOperation({ summary: 'Get menu items' })
   async getMenu(@Param('categoryId') categoryId: string) {
     return this.foodService.getMenuItemsByCategory(categoryId);
   }
 
-  @Roles(Role.GUEST, Role.FRONT_DESK, Role.RESTAURANT_STAFF)
+  @Roles(Role.TRAVELER, Role.FRONT_DESK, Role.RESTAURANT_STAFF)
   @Post('orders')
   @ApiOperation({ summary: 'Create order' })
   async createOrder(@Param('branchId') branchId: string, @Body() createDto: CreateFoodOrderDto) {
     return this.foodService.createOrder(branchId, createDto);
   }
 
-  @Roles(Role.HOTEL_MANAGER, Role.RESTAURANT_STAFF)
+  @Roles(Role.BRANCH_MANAGER, Role.RESTAURANT_STAFF)
   @Get('orders')
   @ApiOperation({ summary: 'Get orders' })
   async getOrders(@Param('branchId') branchId: string) {

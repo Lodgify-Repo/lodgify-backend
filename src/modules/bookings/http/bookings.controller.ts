@@ -14,28 +14,28 @@ import { Role } from '@prisma/client';
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
-  @Roles(Role.GUEST)
+  @Roles(Role.TRAVELER)
   @Post()
   @ApiOperation({ summary: 'Create' })
   async create(@Request() req: any, @Body() createBookingDto: CreateBookingDto) {
     return this.bookingsService.create(req.user.id, createBookingDto);
   }
 
-  @Roles(Role.GUEST)
+  @Roles(Role.TRAVELER)
   @Get('my-bookings')
   @ApiOperation({ summary: 'Get my bookings' })
   async getMyBookings(@Request() req: any) {
     return this.bookingsService.findByGuest(req.user.id);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK)
   @Get('branch/:branchId')
   @ApiOperation({ summary: 'Get branch bookings' })
   async getBranchBookings(@Param('branchId') branchId: string) {
     return this.bookingsService.findByBranch(branchId);
   }
 
-  @Roles(Role.HOTEL_OWNER, Role.HOTEL_MANAGER, Role.FRONT_DESK)
+  @Roles(Role.HOTEL_OWNER, Role.BRANCH_MANAGER, Role.FRONT_DESK)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update status' })
   async updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateBookingStatusDto) {
