@@ -16,4 +16,8 @@ export interface AppEvents {
   'agent_auth:granted': { agentEmail: string; agentName: string; propertyName: string };
   'agent_auth:revoked': { agentEmail: string; agentName: string; propertyName: string };
   'commission:earned': { agentEmail: string; agentName: string; amount: number; reference: string };
+  'property_booking:created': { bookingId: string; propertyId: string; guestId: string; ownerId: string; isInstant: boolean };
+  'property_booking:accepted': { bookingId: string; guestId: string; ownerId: string };
+  'property_booking:declined': { bookingId: string; guestId: string; ownerId: string };
+  'property_message:received': { messageId: string; propertyId: string; senderId: string; receiverId: string; content: string };
 }

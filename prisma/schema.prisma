@@ -47,6 +47,9 @@ model User {
   viewings        ViewingAppointment[]
   sentInvitations SubAccountInvitation[] @relation("SentInvitations")
   guestFoodOrders FoodOrder[] @relation("GuestFoodOrders")
+  propertyBookings PropertyBooking[] @relation("GuestPropertyBookings")
+  sentPropertyMessages PropertyMessage[] @relation("SentPropertyMessages")
+  receivedPropertyMessages PropertyMessage[] @relation("ReceivedPropertyMessages")
 }
 
 enum Role {
@@ -629,9 +632,9 @@ model Property {
   id              String   @id @default(uuid())
   title           String
   description     String
-  type            String   // APARTMENT, VILLA, COMMERCIAL
-  listingType     String   // SALE, RENT
-  price           Float
+  type            String   // APARTMENT, VILLA, TOWNHOUSE, COMMERCIAL, LAND
+  listingType     String   // SHORT_TERM_RENT, LONG_TERM_RENT, SALE
+  price           Float    // Base price / sale price
   currency        String   @default("NGN")
   address         String
   city            String
@@ -642,8 +645,43 @@ model Property {
   bedrooms        Int?
   bathrooms       Int?
   areaSqft        Int?
-  status          String   @default("AVAILABLE") // AVAILABLE, SOLD, RENTED, OFFLINE
+  status          String   @default("AVAILABLE") // DRAFT, AVAILABLE, PAUSED, RENTED, SOLD, OFFLINE
   features        String[]
+
+  // F-P01 & F-P05: Media, Details & Rules
+  videoTourUrl    String?
+  floorPlanUrl    String?
+  amenities       String[] // e.g. ["WIFI", "POOL", "KITCHEN", "AIR_CONDITIONING", "PARKING", "ELEVATOR"]
+  houseRules      String[] // e.g. ["NO_SMOKING", "NO_PARTIES", "QUIET_HOURS_10PM"]
+  cancellationPolicy String @default("FLEXIBLE") // FLEXIBLE, MODERATE, STRICT
+  petFriendly     Boolean  @default(false)
+  furnished       Boolean  @default(false)
+  maxGuests       Int      @default(1)
+
+  // F-P02: Pricing Configuration
+  nightlyRate     Float?
+  monthlyRate     Float?
+  securityDeposit Float?   @default(0)
+  cleaningFee     Float?   @default(0)
+  additionalGuestFee Float? @default(0)
+  baseGuests      Int      @default(1)
+  minStayNights   Int      @default(1)
+  instantBookable Boolean  @default(false)
+
+  // F-P09: Verification Badges
+  isOwnerVerified Boolean  @default(false)
+  isOwnershipVerified Boolean @default(false)
+  isPhotoVerified Boolean  @default(false)
+  verificationStatus String @default("UNVERIFIED") // UNVERIFIED, PENDING, VERIFIED, REJECTED
+  verificationNotes String?
+
+  // F-P11: Performance Analytics
+  viewsCount      Int      @default(0)
+  inquiriesCount  Int      @default(0)
+  bookingsCount   Int      @default(0)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+
   ownerId         String
   owner           User     @relation(fields: [ownerId], references: [id])
   createdAt       DateTime @default(now())
@@ -656,6 +694,10 @@ model Property {
   authorizations  AgentAuthorization[]
   offers          PurchaseOffer[]
   viewings        ViewingAppointment[]
+  blockedDates    PropertyBlockedDate[]
+  pricingRules    PropertyPricingRule[]
+  bookings        PropertyBooking[]
+  messages        PropertyMessage[]
 }
 
 model PropertyImage {
@@ -664,6 +706,8 @@ model PropertyImage {
   property        Property @relation(fields: [propertyId], references: [id])
   url             String
   isPrimary       Boolean  @default(false)
+  caption         String?
+  sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
 }
 
@@ -682,15 +726,117 @@ model PropertyInquiry {
   updatedAt       DateTime @updatedAt
 }
 
+// F-P03: Availability Calendar & Blocks
+model PropertyBlockedDate {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  source          String   @default("MANUAL") // MANUAL, BOOKING, ICAL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, startDate, endDate])
+}
+
+// F-P02: Dynamic Pricing Rules
+model PropertyPricingRule {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  name            String
+  type            String   // SEASONAL, WEEKEND, CUSTOM
+  modifierType    String   // PERCENTAGE, FIXED_AMOUNT, NIGHTLY_RATE
+  modifierValue   Float
+  startDate       DateTime?
+  endDate         DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, isActive])
+}
+
+// F-P06 & F-P07: Rental Bookings & Request Management
+model PropertyBooking {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  guestId         String
+  guest           User     @relation("GuestPropertyBookings", fields: [guestId], references: [id])
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  guestsCount     Int
+  baseAmount      Float
+  cleaningFee     Float    @default(0)
+  securityDeposit Float    @default(0)
+  extraGuestsFee  Float    @default(0)
+  totalAmount     Float
+  currency        String   @default("NGN")
+  status          String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED, CANCELLED, PAID, CHECKED_IN, COMPLETED
+  paymentMethod   String?  // PAYSTACK, TRANSFER, CARD
+  paymentReference String?
+  rentalAgreementText String?
+  specialRequests String?
+  declineReason   String?
+  expiresAt       DateTime? // 24h timeout default for booking requests
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reviews         PropertyReview[]
+  messages        PropertyMessage[]
+
+  @@index([propertyId, checkInDate, checkOutDate])
+  @@index([guestId])
+}
+
+// F-P08: Guest-Owner Messaging
+model PropertyMessage {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  senderId        String
+  sender          User     @relation("SentPropertyMessages", fields: [senderId], references: [id])
+  receiverId      String
+  receiver        User     @relation("ReceivedPropertyMessages", fields: [receiverId], references: [id])
+  bookingId       String?
+  booking         PropertyBooking? @relation(fields: [bookingId], references: [id])
+  message         String
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([propertyId, senderId, receiverId])
+}
+
+// F-P10: Review & Rating System
 model PropertyReview {
   id              String   @id @default(uuid())
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id])
   userId          String
   user            User     @relation(fields: [userId], references: [id])
-  rating          Int
+  bookingId       String?
+  booking         PropertyBooking? @relation(fields: [bookingId], references: [id])
+  
+  // 6-Category Rating System
+  cleanliness     Int      @default(5)
+  accuracy        Int      @default(5)
+  checkIn         Int      @default(5)
+  communication   Int      @default(5)
+  location        Int      @default(5)
+  value           Int      @default(5)
+  overallRating   Float    @default(5.0)
+  
   comment         String?
+  ownerResponse   String?
+  ownerRespondedAt DateTime?
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
 }
 
 // ---------------------------------------------------------
