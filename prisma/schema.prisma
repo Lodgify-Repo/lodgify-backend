@@ -47,6 +47,12 @@ model User {
   viewings        ViewingAppointment[]
   sentInvitations SubAccountInvitation[] @relation("SentInvitations")
   guestFoodOrders FoodOrder[] @relation("GuestFoodOrders")
+  propertyBookings PropertyBooking[] @relation("GuestPropertyBookings")
+  sentPropertyMessages PropertyMessage[] @relation("SentPropertyMessages")
+  receivedPropertyMessages PropertyMessage[] @relation("ReceivedPropertyMessages")
+  agentReviewsGiven    AgentReview[]      @relation("ClientAgentReviews")
+  agentInvitationsSent AgentInvitation[]  @relation("OwnerAgentInvitations")
+  savedSearches        BuyerSavedSearch[]
 }
 
 enum Role {
@@ -629,9 +635,9 @@ model Property {
   id              String   @id @default(uuid())
   title           String
   description     String
-  type            String   // APARTMENT, VILLA, COMMERCIAL
-  listingType     String   // SALE, RENT
-  price           Float
+  type            String   // APARTMENT, VILLA, TOWNHOUSE, COMMERCIAL, LAND
+  listingType     String   // SHORT_TERM_RENT, LONG_TERM_RENT, SALE
+  price           Float    // Base price / sale price
   currency        String   @default("NGN")
   address         String
   city            String
@@ -642,8 +648,52 @@ model Property {
   bedrooms        Int?
   bathrooms       Int?
   areaSqft        Int?
-  status          String   @default("AVAILABLE") // AVAILABLE, SOLD, RENTED, OFFLINE
+  status          String   @default("AVAILABLE") // DRAFT, AVAILABLE, PAUSED, RENTED, SOLD, OFFLINE
   features        String[]
+
+  // F-P01 & F-P05: Media, Details & Rules
+  videoTourUrl    String?
+  floorPlanUrl    String?
+  amenities       String[] // e.g. ["WIFI", "POOL", "KITCHEN", "AIR_CONDITIONING", "PARKING", "ELEVATOR"]
+  houseRules      String[] // e.g. ["NO_SMOKING", "NO_PARTIES", "QUIET_HOURS_10PM"]
+  cancellationPolicy String @default("FLEXIBLE") // FLEXIBLE, MODERATE, STRICT
+  petFriendly     Boolean  @default(false)
+  furnished       Boolean  @default(false)
+  maxGuests       Int      @default(1)
+
+  // F-P02: Pricing Configuration
+  nightlyRate     Float?
+  monthlyRate     Float?
+  securityDeposit Float?   @default(0)
+  cleaningFee     Float?   @default(0)
+  additionalGuestFee Float? @default(0)
+  baseGuests      Int      @default(1)
+  minStayNights   Int      @default(1)
+  instantBookable Boolean  @default(false)
+
+  // F-PS01: Sale Listing Configuration
+  askingPrice     Float?
+  isPriceNegotiable Boolean  @default(false)
+  yearBuilt       Int?
+  titleType       String?  // C_OF_O, GOVERNORS_CONSENT, GAZETTE, DEED_OF_ASSIGNMENT, EXCISION, SURVEY_PLAN
+  neighborhoodDescription String?
+  nearbyAmenities String[] // e.g. ["SCHOOLS", "SHOPPING_MALL", "HOSPITAL", "HIGHWAY_ACCESS", "AIRPORT"]
+  salesPipelineStatus String @default("LISTED") // LISTED, OFFER_RECEIVED, NEGOTIATING, OFFER_ACCEPTED, DUE_DILIGENCE, CLOSING, SOLD
+
+  // F-P09: Verification Badges
+  isOwnerVerified Boolean  @default(false)
+  isOwnershipVerified Boolean @default(false)
+  isPhotoVerified Boolean  @default(false)
+  verificationStatus String @default("UNVERIFIED") // UNVERIFIED, PENDING, VERIFIED, REJECTED
+  verificationNotes String?
+
+  // F-P11: Performance Analytics
+  viewsCount      Int      @default(0)
+  inquiriesCount  Int      @default(0)
+  bookingsCount   Int      @default(0)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+
   ownerId         String
   owner           User     @relation(fields: [ownerId], references: [id])
   createdAt       DateTime @default(now())
@@ -656,6 +706,16 @@ model Property {
   authorizations  AgentAuthorization[]
   offers          PurchaseOffer[]
   viewings        ViewingAppointment[]
+  blockedDates    PropertyBlockedDate[]
+  pricingRules    PropertyPricingRule[]
+  bookings        PropertyBooking[]
+  messages        PropertyMessage[]
+  leads           Lead[]
+  commissions     CommissionRecord[]
+  agentInvitations AgentInvitation[]
+  saleDocuments   PropertySaleDocument[]
+  milestones      SaleTransactionMilestone[]
+  savedSearches   BuyerSavedSearch[]
 }
 
 model PropertyImage {
@@ -664,6 +724,8 @@ model PropertyImage {
   property        Property @relation(fields: [propertyId], references: [id])
   url             String
   isPrimary       Boolean  @default(false)
+  caption         String?
+  sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
 }
 
@@ -682,15 +744,117 @@ model PropertyInquiry {
   updatedAt       DateTime @updatedAt
 }
 
+// F-P03: Availability Calendar & Blocks
+model PropertyBlockedDate {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  source          String   @default("MANUAL") // MANUAL, BOOKING, ICAL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, startDate, endDate])
+}
+
+// F-P02: Dynamic Pricing Rules
+model PropertyPricingRule {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  name            String
+  type            String   // SEASONAL, WEEKEND, CUSTOM
+  modifierType    String   // PERCENTAGE, FIXED_AMOUNT, NIGHTLY_RATE
+  modifierValue   Float
+  startDate       DateTime?
+  endDate         DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, isActive])
+}
+
+// F-P06 & F-P07: Rental Bookings & Request Management
+model PropertyBooking {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  guestId         String
+  guest           User     @relation("GuestPropertyBookings", fields: [guestId], references: [id])
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  guestsCount     Int
+  baseAmount      Float
+  cleaningFee     Float    @default(0)
+  securityDeposit Float    @default(0)
+  extraGuestsFee  Float    @default(0)
+  totalAmount     Float
+  currency        String   @default("NGN")
+  status          String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED, CANCELLED, PAID, CHECKED_IN, COMPLETED
+  paymentMethod   String?  // PAYSTACK, TRANSFER, CARD
+  paymentReference String?
+  rentalAgreementText String?
+  specialRequests String?
+  declineReason   String?
+  expiresAt       DateTime? // 24h timeout default for booking requests
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reviews         PropertyReview[]
+  messages        PropertyMessage[]
+
+  @@index([propertyId, checkInDate, checkOutDate])
+  @@index([guestId])
+}
+
+// F-P08: Guest-Owner Messaging
+model PropertyMessage {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  senderId        String
+  sender          User     @relation("SentPropertyMessages", fields: [senderId], references: [id])
+  receiverId      String
+  receiver        User     @relation("ReceivedPropertyMessages", fields: [receiverId], references: [id])
+  bookingId       String?
+  booking         PropertyBooking? @relation(fields: [bookingId], references: [id])
+  message         String
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([propertyId, senderId, receiverId])
+}
+
+// F-P10: Review & Rating System
 model PropertyReview {
   id              String   @id @default(uuid())
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id])
   userId          String
   user            User     @relation(fields: [userId], references: [id])
-  rating          Int
+  bookingId       String?
+  booking         PropertyBooking? @relation(fields: [bookingId], references: [id])
+  
+  // 6-Category Rating System
+  cleanliness     Int      @default(5)
+  accuracy        Int      @default(5)
+  checkIn         Int      @default(5)
+  communication   Int      @default(5)
+  location        Int      @default(5)
+  value           Int      @default(5)
+  overallRating   Float    @default(5.0)
+  
   comment         String?
+  ownerResponse   String?
+  ownerRespondedAt DateTime?
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
 }
 
 // ---------------------------------------------------------
@@ -700,20 +864,41 @@ model AgentProfile {
   id              String   @id @default(uuid())
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id])
+  accountType     String   @default("INDIVIDUAL") // INDIVIDUAL, COMPANY
   agencyName      String?
   licenseNumber   String?
+  bio             String?
+  photoUrl        String?
+  specializations String[] // e.g. ["LUXURY_VILLAS", "COMMERCIAL", "SHORT_TERM_RENTALS", "RESIDENTIAL"]
+  areasServed     String[] // e.g. ["LEKKI", "VICTORIA_ISLAND", "IKOYI", "IKEJA"]
+  yearsOfExperience Int?
+  website         String?
+  socialLinks     Json?
+  
+  // Verification (F-AG02)
   licenseUrl      String?
   companyRegistrationUrl String?
+  idDocumentUrl   String?
+  isVerified      Boolean  @default(false)
+  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationNotes String?
+
   tier            String   @default("STANDARD") // STANDARD, PREMIUM
   commissionRate  Float    @default(5.0)
   totalSales      Float    @default(0)
-  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  bankAccountDetails Json? // Bank details for automated payouts
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   authorizations  AgentAuthorization[]
   leads           Lead[]
   commissions     CommissionRecord[]
+  reviews         AgentReview[]
+  invitations     AgentInvitation[]
+  viewings        ViewingAppointment[]
 }
 
 model AgentAuthorization {
@@ -722,8 +907,12 @@ model AgentAuthorization {
   agent           AgentProfile @relation(fields: [agentId], references: [id])
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id])
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String   @default("PENDING") // PENDING, APPROVED, DECLINED, REVOKED
+  pitchMessage    String?
+  proposedRate    Float?
   agreedRate      Float?
+  declineReason   String?
+  referralCode    String   @unique @default(uuid())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -734,31 +923,80 @@ model Lead {
   id              String   @id @default(uuid())
   agentId         String
   agent           AgentProfile @relation(fields: [agentId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
   name            String
   email           String?
   phone           String?
-  source          String?
-  status          String   @default("NEW") // NEW, CONTACTED, QUALIFIED, LOST
+  source          String?  // REFERRAL_LINK, DIRECT_INQUIRY, SOCIAL, MANUAL
+  status          String   @default("NEW") // NEW, CONTACTED, VIEWING_SCHEDULED, NEGOTIATING, CLOSED_WON, CLOSED_LOST
+  estimatedValue  Float?
   notes           String?
+  stageHistory    Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  viewings        ViewingAppointment[]
 }
 
 model CommissionRecord {
   id              String   @id @default(uuid())
   agentId         String
   agent           AgentProfile @relation(fields: [agentId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
+  bookingId       String?
   transactionType String   // SALE, RENTAL
+  totalTransactionValue Float?
+  agreedRate      Float    @default(5.0)
   amount          Float
-  status          String   @default("PENDING") // PENDING, PAID
+  status          String   @default("PENDING") // PENDING, CONFIRMED, READY_FOR_PAYOUT, PAID
+  payoutMethod    String?  // PAYSTACK, BANK_TRANSFER
+  payoutReference String?
+  payoutReceiptUrl String?
   paidAt          DateTime?
   referenceId     String?  // ID of the sale/rental booking
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
+// F-AG12: Client Reviews for Agents
+model AgentReview {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  reviewerId      String
+  reviewer        User     @relation("ClientAgentReviews", fields: [reviewerId], references: [id])
+  professionalism Int      @default(5)
+  marketKnowledge Int      @default(5)
+  responsiveness  Int      @default(5)
+  overallRating   Float    @default(5.0)
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  @@index([agentId])
+}
+
+// F-AG04 & F-AG12: Owner Agent Invitation
+model AgentInvitation {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  ownerId         String
+  owner           User     @relation("OwnerAgentInvitations", fields: [ownerId], references: [id])
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  proposedRate    Float?
+  message         String?
+  status          String   @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([agentId, status])
+}
+
 // ---------------------------------------------------------
-// OFFERS & VIEWINGS (F-PS01 to F-PS10)
+// OFFERS & PROPERTY SALES (F-PS01 to F-PS10)
 // ---------------------------------------------------------
 model PurchaseOffer {
   id              String   @id @default(uuid())
@@ -771,9 +1009,31 @@ model PurchaseOffer {
   buyerPhone      String
   offerAmount     Float
   conditions      String?
-  status          String   @default("SUBMITTED") // SUBMITTED, ACCEPTED, REJECTED, COUNTERED
+  
+  // F-PS02: Formal Offer Details
+  financingMethod String   @default("CASH") // CASH, MORTGAGE
+  proposedClosingDate DateTime?
+  contingencies   String[] // ["INSPECTION", "APPRAISAL", "FINANCING", "TITLE_SEARCH"]
+  earnestDepositAmount Float @default(0)
+  earnestDepositStatus String @default("PENDING") // PENDING, HELD_IN_ESCROW, CREDITED_AT_CLOSING, REFUNDED, FORFEITED
+  earnestDepositReference String?
+  earnestDepositPaidAt DateTime?
+  preApprovalLetterUrl String?
+
+  // F-PS03: Counter-Offer & Negotiation
+  counterAmount   Float?
+  counterConditions String?
+  counteredBy     String?  // BUYER, SELLER
+  negotiationHistory Json? // Array of negotiation history rounds
+
+  status          String   @default("SUBMITTED") // SUBMITTED, ACCEPTED, REJECTED, COUNTERED, EXPIRED, WITHDRAWN
+  expiresAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  milestones      SaleTransactionMilestone[]
+
+  @@index([propertyId, status])
 }
 
 model ViewingAppointment {
@@ -782,14 +1042,85 @@ model ViewingAppointment {
   property        Property @relation(fields: [propertyId], references: [id])
   userId          String?
   user            User?    @relation(fields: [userId], references: [id])
+  agentId         String?
+  agent           AgentProfile? @relation(fields: [agentId], references: [id])
+  leadId          String?
+  lead            Lead?    @relation(fields: [leadId], references: [id])
   clientName      String
   clientEmail     String
   clientPhone     String
   scheduledDate   DateTime
-  status          String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+
+  // F-PS06: Viewing Types & Host
+  viewingType     String   @default("PRIVATE_SHOWING") // OPEN_HOUSE, PRIVATE_SHOWING, VIRTUAL_TOUR
+  hostType        String   @default("OWNER") // OWNER, AGENT
+  hostId          String?
+
+  status          String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, RESCHEDULED
   notes           String?
+  feedback        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, scheduledDate])
+}
+
+// F-PS07: Secure Legal Document Management for Property Sales
+model PropertySaleDocument {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  title           String
+  docType         String   // TITLE_DEED, SURVEY_PLAN, TAX_CLEARANCE, BUILDING_APPROVAL, OTHER
+  fileUrl         String
+  isConfidential  Boolean  @default(true)
+  accessLevel     String   @default("RESTRICTED") // RESTRICTED, PUBLIC, VERIFIED_BUYERS_ONLY
+  uploadedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
+}
+
+// F-PS09: Buyer Saved Searches & Notification Alerts
+model BuyerSavedSearch {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
+  name            String
+  criteria        Json     // e.g. { minPrice, maxPrice, bedrooms, propertyType, city, neighborhood }
+  emailAlerts     Boolean  @default(true)
+  alertFrequency  String   @default("INSTANT") // INSTANT, DAILY, WEEKLY
+  lastAlertSentAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// F-PS10: Sales Transaction Milestones Tracker
+model SaleTransactionMilestone {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  offerId         String
+  offer           PurchaseOffer @relation(fields: [offerId], references: [id])
+  milestoneType   String   // OFFER_ACCEPTED, INSPECTION_COMPLETE, FINANCING_SECURED, TITLE_VERIFIED, CLOSING_DATE_SET, FUNDS_TRANSFERRED, KEYS_HANDED_OVER
+  name            String
+  description     String?
+  status          String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, WAIVED
+  dueDate         DateTime?
+  completedAt     DateTime?
+  attachmentUrls  String[]
+  notes           String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([offerId])
+  @@index([propertyId])
 }
 
 // ---------------------------------------------------------
