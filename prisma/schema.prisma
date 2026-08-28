@@ -30,6 +30,10 @@ model User {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
+  // F-F12: Dietary Preferences
+  dietaryPreferences String[]
+  allergyNotes       String?
+
   // Relations
   subAccounts     User[]   @relation("SubAccounts")
   hotel           Hotel?
@@ -42,6 +46,7 @@ model User {
   offers          PurchaseOffer[]
   viewings        ViewingAppointment[]
   sentInvitations SubAccountInvitation[] @relation("SentInvitations")
+  guestFoodOrders FoodOrder[] @relation("GuestFoodOrders")
 }
 
 enum Role {
@@ -114,6 +119,7 @@ model Branch {
   purchaseOrders  PurchaseOrder[]
   menuCategories  MenuCategory[]
   foodOrders      FoodOrder[]
+  dailySpecials   DailySpecial[]
 
   storageLocations StorageLocation[]
   stockCounts      StockCount[]
@@ -514,6 +520,10 @@ model MenuCategory {
   branch          Branch   @relation(fields: [branchId], references: [id])
   name            String
   description     String?
+  availableFrom   String?  // e.g. "06:00"
+  availableTo     String?  // e.g. "11:00"
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -528,6 +538,9 @@ model MenuItem {
   description     String?
   price           Float
   imageUrl        String?
+  photos          String[]
+  dietaryTags     String[]  // ["vegetarian", "vegan", "gluten-free", "halal"]
+  availability    String   @default("IN_STOCK") // IN_STOCK, OUT_OF_STOCK, SEASONAL
   isAvailable     Boolean  @default(true)
   preparationTime Int?     // in minutes
   createdAt       DateTime @default(now())
@@ -536,6 +549,7 @@ model MenuItem {
 
   recipe          MenuItemRecipe[]
   orderItems      FoodOrderItem[]
+  dailySpecials   DailySpecial[]
 }
 
 model MenuItemRecipe {
@@ -547,27 +561,51 @@ model MenuItemRecipe {
   quantityNeeded  Float
 }
 
-model FoodOrder {
-  id              String   @id @default(uuid())
-  branchId        String
-  branch          Branch   @relation(fields: [branchId], references: [id])
-  bookingId       String?
-  booking         Booking? @relation(fields: [bookingId], references: [id])
-  tableNumber     String?
-  status          FoodOrderStatus @default(PENDING)
-  totalAmount     Float
-  specialNotes    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model DailySpecial {
+  id               String   @id @default(uuid())
+  branchId         String
+  branch           Branch   @relation(fields: [branchId], references: [id])
+  menuItemId       String
+  menuItem         MenuItem @relation(fields: [menuItemId], references: [id])
+  promotionalPrice Float
+  description      String?
+  startsAt         DateTime
+  expiresAt        DateTime
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+}
 
-  items           FoodOrderItem[]
+model FoodOrder {
+  id                    String   @id @default(uuid())
+  branchId              String
+  branch                Branch   @relation(fields: [branchId], references: [id])
+  bookingId             String?
+  booking               Booking? @relation(fields: [bookingId], references: [id])
+  guestId               String?
+  guest                 User?    @relation("GuestFoodOrders", fields: [guestId], references: [id])
+  tableNumber           String?
+  roomNumber            String?
+  deliveryType          String   @default("ASAP") // ASAP, SCHEDULED
+  scheduledTime         DateTime?
+  paymentMethod         String?  // PAYSTACK, BILL_TO_ROOM
+  paymentReference      String?
+  estimatedDeliveryTime Int?     // minutes
+  status                FoodOrderStatus @default(PENDING)
+  totalAmount           Float
+  specialNotes          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  items                 FoodOrderItem[]
   inventoryTransactions InventoryTransaction[]
 }
 
 enum FoodOrderStatus {
   PENDING
+  RECEIVED
   PREPARING
   READY
+  OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
 }
