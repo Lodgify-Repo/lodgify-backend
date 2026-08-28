@@ -52,6 +52,7 @@ model User {
   receivedPropertyMessages PropertyMessage[] @relation("ReceivedPropertyMessages")
   agentReviewsGiven    AgentReview[]      @relation("ClientAgentReviews")
   agentInvitationsSent AgentInvitation[]  @relation("OwnerAgentInvitations")
+  savedSearches        BuyerSavedSearch[]
 }
 
 enum Role {
@@ -670,6 +671,15 @@ model Property {
   minStayNights   Int      @default(1)
   instantBookable Boolean  @default(false)
 
+  // F-PS01: Sale Listing Configuration
+  askingPrice     Float?
+  isPriceNegotiable Boolean  @default(false)
+  yearBuilt       Int?
+  titleType       String?  // C_OF_O, GOVERNORS_CONSENT, GAZETTE, DEED_OF_ASSIGNMENT, EXCISION, SURVEY_PLAN
+  neighborhoodDescription String?
+  nearbyAmenities String[] // e.g. ["SCHOOLS", "SHOPPING_MALL", "HOSPITAL", "HIGHWAY_ACCESS", "AIRPORT"]
+  salesPipelineStatus String @default("LISTED") // LISTED, OFFER_RECEIVED, NEGOTIATING, OFFER_ACCEPTED, DUE_DILIGENCE, CLOSING, SOLD
+
   // F-P09: Verification Badges
   isOwnerVerified Boolean  @default(false)
   isOwnershipVerified Boolean @default(false)
@@ -703,6 +713,9 @@ model Property {
   leads           Lead[]
   commissions     CommissionRecord[]
   agentInvitations AgentInvitation[]
+  saleDocuments   PropertySaleDocument[]
+  milestones      SaleTransactionMilestone[]
+  savedSearches   BuyerSavedSearch[]
 }
 
 model PropertyImage {
@@ -983,7 +996,7 @@ model AgentInvitation {
 }
 
 // ---------------------------------------------------------
-// OFFERS & VIEWINGS (F-PS01 to F-PS10)
+// OFFERS & PROPERTY SALES (F-PS01 to F-PS10)
 // ---------------------------------------------------------
 model PurchaseOffer {
   id              String   @id @default(uuid())
@@ -996,9 +1009,31 @@ model PurchaseOffer {
   buyerPhone      String
   offerAmount     Float
   conditions      String?
-  status          String   @default("SUBMITTED") // SUBMITTED, ACCEPTED, REJECTED, COUNTERED
+  
+  // F-PS02: Formal Offer Details
+  financingMethod String   @default("CASH") // CASH, MORTGAGE
+  proposedClosingDate DateTime?
+  contingencies   String[] // ["INSPECTION", "APPRAISAL", "FINANCING", "TITLE_SEARCH"]
+  earnestDepositAmount Float @default(0)
+  earnestDepositStatus String @default("PENDING") // PENDING, HELD_IN_ESCROW, CREDITED_AT_CLOSING, REFUNDED, FORFEITED
+  earnestDepositReference String?
+  earnestDepositPaidAt DateTime?
+  preApprovalLetterUrl String?
+
+  // F-PS03: Counter-Offer & Negotiation
+  counterAmount   Float?
+  counterConditions String?
+  counteredBy     String?  // BUYER, SELLER
+  negotiationHistory Json? // Array of negotiation history rounds
+
+  status          String   @default("SUBMITTED") // SUBMITTED, ACCEPTED, REJECTED, COUNTERED, EXPIRED, WITHDRAWN
+  expiresAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  milestones      SaleTransactionMilestone[]
+
+  @@index([propertyId, status])
 }
 
 model ViewingAppointment {
@@ -1015,11 +1050,77 @@ model ViewingAppointment {
   clientEmail     String
   clientPhone     String
   scheduledDate   DateTime
+
+  // F-PS06: Viewing Types & Host
+  viewingType     String   @default("PRIVATE_SHOWING") // OPEN_HOUSE, PRIVATE_SHOWING, VIRTUAL_TOUR
+  hostType        String   @default("OWNER") // OWNER, AGENT
+  hostId          String?
+
   status          String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, RESCHEDULED
   notes           String?
   feedback        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, scheduledDate])
+}
+
+// F-PS07: Secure Legal Document Management for Property Sales
+model PropertySaleDocument {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  title           String
+  docType         String   // TITLE_DEED, SURVEY_PLAN, TAX_CLEARANCE, BUILDING_APPROVAL, OTHER
+  fileUrl         String
+  isConfidential  Boolean  @default(true)
+  accessLevel     String   @default("RESTRICTED") // RESTRICTED, PUBLIC, VERIFIED_BUYERS_ONLY
+  uploadedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
+}
+
+// F-PS09: Buyer Saved Searches & Notification Alerts
+model BuyerSavedSearch {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
+  name            String
+  criteria        Json     // e.g. { minPrice, maxPrice, bedrooms, propertyType, city, neighborhood }
+  emailAlerts     Boolean  @default(true)
+  alertFrequency  String   @default("INSTANT") // INSTANT, DAILY, WEEKLY
+  lastAlertSentAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// F-PS10: Sales Transaction Milestones Tracker
+model SaleTransactionMilestone {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  offerId         String
+  offer           PurchaseOffer @relation(fields: [offerId], references: [id])
+  milestoneType   String   // OFFER_ACCEPTED, INSPECTION_COMPLETE, FINANCING_SECURED, TITLE_VERIFIED, CLOSING_DATE_SET, FUNDS_TRANSFERRED, KEYS_HANDED_OVER
+  name            String
+  description     String?
+  status          String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, WAIVED
+  dueDate         DateTime?
+  completedAt     DateTime?
+  attachmentUrls  String[]
+  notes           String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([offerId])
+  @@index([propertyId])
 }
 
 // ---------------------------------------------------------

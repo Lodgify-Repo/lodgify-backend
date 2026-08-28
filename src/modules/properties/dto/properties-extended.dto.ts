@@ -156,6 +156,45 @@ export class CreatePropertyExtendedDto {
   @IsNumber()
   maxGuests?: number;
 
+  // F-PS01: Sale Listing Configuration
+  @ApiPropertyOptional({ description: 'Asking price for sale listing', example: 120000000 })
+  @IsOptional()
+  @IsNumber()
+  askingPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Whether the asking price is negotiable', default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPriceNegotiable?: boolean;
+
+  @ApiPropertyOptional({ description: 'Year the property was constructed', example: 2023 })
+  @IsOptional()
+  @IsNumber()
+  yearBuilt?: number;
+
+  @ApiPropertyOptional({
+    description: 'Title or deed type',
+    enum: ['C_OF_O', 'GOVERNORS_CONSENT', 'GAZETTE', 'DEED_OF_ASSIGNMENT', 'EXCISION', 'SURVEY_PLAN'],
+    example: 'C_OF_O',
+  })
+  @IsOptional()
+  @IsString()
+  titleType?: string;
+
+  @ApiPropertyOptional({ description: 'Detailed neighborhood and location description' })
+  @IsOptional()
+  @IsString()
+  neighborhoodDescription?: string;
+
+  @ApiPropertyOptional({
+    description: 'Nearby amenities and landmarks',
+    example: ['Lekki Toll Gate', 'Green Springs School', 'Ebeano Supermarket', 'Chevron HQ'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nearbyAmenities?: string[];
+
   // F-P02: Pricing Details
   @ApiPropertyOptional({ description: 'Nightly rate for short-term rental', example: 120000 })
   @IsOptional()

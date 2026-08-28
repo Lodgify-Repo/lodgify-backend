@@ -20,4 +20,6 @@ export interface AppEvents {
   'property_booking:accepted': { bookingId: string; guestId: string; ownerId: string };
   'property_booking:declined': { bookingId: string; guestId: string; ownerId: string };
   'property_message:received': { messageId: string; propertyId: string; senderId: string; receiverId: string; content: string };
+  'property:updated': { propertyId: string };
+  'property_sale:milestone_updated': { milestoneId: string; offerId: string; status: string };
 }

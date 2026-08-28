@@ -302,4 +302,72 @@ export class PropertiesService extends Service {
 
     return profile;
   }
+
+  // F-PS08: Sales Analytics & Market Comparables
+  async getSalesAnalytics(propertyId: string, ownerId: string) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        offers: true,
+        viewings: true,
+      },
+    });
+
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.ownerId !== ownerId) throw new BadRequestException('Unauthorized');
+
+    const createdTime = new Date(property.createdAt).getTime();
+    const daysOnMarket = Math.max(1, Math.floor((Date.now() - createdTime) / (1000 * 60 * 60 * 24)));
+
+    const offersReceived = property.offers.length;
+    const highestOffer = property.offers.length > 0 ? Math.max(...property.offers.map(o => o.offerAmount)) : 0;
+    const averageOffer = property.offers.length > 0 ? property.offers.reduce((sum, o) => sum + o.offerAmount, 0) / property.offers.length : 0;
+    const viewingsCount = property.viewings.length;
+
+    // Similar sold properties in the same city / neighborhood
+    const similarSold = await this.prisma.property.findMany({
+      where: {
+        city: property.city,
+        type: property.type,
+        listingType: 'SALE',
+        salesPipelineStatus: 'SOLD',
+        id: { not: propertyId },
+      },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        askingPrice: true,
+        areaSqft: true,
+        bedrooms: true,
+        updatedAt: true,
+      },
+    });
+
+    const avgSoldPrice = similarSold.length > 0
+      ? similarSold.reduce((sum, p) => sum + (p.askingPrice || p.price || 0), 0) / similarSold.length
+      : property.askingPrice || property.price || 0;
+
+    return {
+      propertyId: property.id,
+      title: property.title,
+      askingPrice: property.askingPrice || property.price,
+      salesPipelineStatus: property.salesPipelineStatus,
+      metrics: {
+        daysOnMarket,
+        viewsCount: property.viewsCount,
+        inquiriesCount: property.inquiriesCount,
+        viewingsScheduledCount: viewingsCount,
+        offersReceivedCount: offersReceived,
+        highestOfferAmount: highestOffer,
+        averageOfferAmount: Math.round(averageOffer),
+      },
+      marketComparables: {
+        comparablesCount: similarSold.length,
+        averageSoldPriceInArea: Math.round(avgSoldPrice),
+        similarSoldProperties: similarSold,
+      },
+    };
+  }
 }

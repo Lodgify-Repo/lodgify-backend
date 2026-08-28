@@ -99,6 +99,14 @@ export class PropertiesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROPERTY_OWNER, Role.HOTEL_OWNER)
+  @Get(':id/sales-analytics')
+  @ApiOperation({ summary: 'F-PS08: Sales performance analytics and market comparables for sale listing' })
+  async getSalesAnalytics(@Request() req: any, @Param('id') id: string) {
+    return this.propertiesService.getSalesAnalytics(id, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @Patch('owner-profiles/:id/verify')
   @ApiOperation({ summary: 'F-P09: Approve or reject property owner verification profile' })

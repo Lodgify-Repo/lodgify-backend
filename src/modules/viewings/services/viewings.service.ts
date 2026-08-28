@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Service } from '@/common/domain/base.service';
 import { PrismaService } from '@/infra/database/prisma.service';
-import { ScheduleViewingDto, UpdateViewingStatusDto } from '../dto/viewings.dto';
+import { ScheduleSaleViewingDto, UpdateViewingStatusExtendedDto } from '../dto/viewings-extended.dto';
 import { DomainError } from '@/common/domain/error';
 import { ViewingErrorCodes } from '../errors';
+import EventBus from '@/common/events/event-bus';
 
 @Injectable()
 export class ViewingsService extends Service {
@@ -13,10 +14,10 @@ export class ViewingsService extends Service {
 
   private static readonly CONFLICT_WINDOW_MS = 60 * 60 * 1000; 
 
-  async schedule(userId: string, scheduleDto: ScheduleViewingDto) {
+  // F-PS06: Schedule Viewing (Private Showing, Open House, Virtual Tour)
+  async schedule(userId: string, scheduleDto: ScheduleSaleViewingDto) {
     const scheduledDate = new Date(scheduleDto.date);
 
-    // Reject dates in the past
     if (scheduledDate.getTime() <= Date.now()) {
       throw new DomainError(
         ViewingErrorCodes.VIEWING_INVALID_DATE,
@@ -24,10 +25,9 @@ export class ViewingsService extends Service {
       );
     }
 
-    // Validate property exists
     const property = await this.prisma.property.findUnique({
       where: { id: scheduleDto.propertyId },
-      select: { id: true },
+      include: { owner: true },
     });
     if (!property) {
       throw new DomainError(
@@ -36,7 +36,6 @@ export class ViewingsService extends Service {
       );
     }
 
-    // Validate user exists (no silent guest fallback — if a userId is provided it must be real)
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new DomainError(
@@ -45,69 +44,110 @@ export class ViewingsService extends Service {
       );
     }
 
-    // Conflict check + create inside a serializable transaction to prevent race conditions
-    const windowStart = new Date(scheduledDate.getTime() - ViewingsService.CONFLICT_WINDOW_MS);
-    const windowEnd = new Date(scheduledDate.getTime() + ViewingsService.CONFLICT_WINDOW_MS);
+    // If it's a private showing, prevent overlap conflict
+    if (scheduleDto.viewingType !== 'OPEN_HOUSE') {
+      const windowStart = new Date(scheduledDate.getTime() - ViewingsService.CONFLICT_WINDOW_MS);
+      const windowEnd = new Date(scheduledDate.getTime() + ViewingsService.CONFLICT_WINDOW_MS);
 
-    return await this.prisma.$transaction(async (tx) => {
-      const conflict = await tx.viewingAppointment.findFirst({
+      const conflict = await this.prisma.viewingAppointment.findFirst({
         where: {
           propertyId: scheduleDto.propertyId,
-          status: { not: 'CANCELLED' },
+          viewingType: 'PRIVATE_SHOWING',
+          status: { in: ['SCHEDULED', 'CONFIRMED'] },
           scheduledDate: { gte: windowStart, lte: windowEnd },
         },
-        select: { id: true, scheduledDate: true },
       });
 
       if (conflict) {
         throw new DomainError(
           ViewingErrorCodes.SLOT_UNAVAILABLE,
-          `Property already has a viewing scheduled at ${conflict.scheduledDate.toISOString()}`,
-          { conflictingViewingId: conflict.id, conflictingDate: conflict.scheduledDate },
+          `Property already has a private showing scheduled around this time (${conflict.scheduledDate.toISOString()})`,
         );
       }
+    }
 
-      return await tx.viewingAppointment.create({
-        data: {
-          userId,
-          clientName: `${user.firstName} ${user.lastName}`,
-          clientEmail: user.email,
-          clientPhone: user.phone || '',
-          propertyId: scheduleDto.propertyId,
-          scheduledDate,
-          notes: scheduleDto.notes,
-        },
-      });
+    const viewing = await this.prisma.viewingAppointment.create({
+      data: {
+        userId,
+        propertyId: scheduleDto.propertyId,
+        clientName: `${user.firstName} ${user.lastName}`,
+        clientEmail: user.email,
+        clientPhone: user.phone || '',
+        scheduledDate,
+        viewingType: scheduleDto.viewingType || 'PRIVATE_SHOWING',
+        hostType: scheduleDto.hostType || 'OWNER',
+        hostId: scheduleDto.hostId,
+        notes: scheduleDto.notes,
+        status: 'SCHEDULED',
+      },
+      include: {
+        property: { select: { title: true, address: true, city: true } },
+      },
     });
+
+    EventBus.emit('property:viewing_requested', { viewingId: viewing.id }, 'ViewingsService');
+
+    return viewing;
   }
 
+  // F-PS06: Get buyer's scheduled viewings
   async getMyViewings(userId: string) {
     return await this.prisma.viewingAppointment.findMany({
       where: { userId },
-      include: { property: { select: { title: true, address: true } } },
+      include: { property: { select: { id: true, title: true, address: true, city: true, askingPrice: true, price: true } } },
+      orderBy: { scheduledDate: 'asc' },
     });
   }
 
-  async getAgentViewings(agentId: string) {
+  // F-PS06: Get property owner's scheduled viewings for their properties
+  async getOwnerViewings(ownerId: string) {
     return await this.prisma.viewingAppointment.findMany({
-      where: { property: { authorizations: { some: { agentId } } } },
+      where: { property: { ownerId } },
       include: {
-        property: { select: { title: true } },
-        user: { select: { firstName: true, lastName: true, phone: true } },
+        property: { select: { id: true, title: true, city: true } },
+        user: { select: { firstName: true, lastName: true, email: true, phone: true } },
       },
       orderBy: { scheduledDate: 'asc' },
     });
   }
 
-  async updateStatus(id: string, updateDto: UpdateViewingStatusDto) {
+  // F-PS06: Get agent viewings
+  async getAgentViewings(userId: string) {
+    return await this.prisma.viewingAppointment.findMany({
+      where: {
+        OR: [
+          { agent: { userId } },
+          { property: { authorizations: { some: { agent: { userId }, status: 'APPROVED' } } } },
+        ],
+      },
+      include: {
+        property: { select: { id: true, title: true, city: true } },
+        user: { select: { firstName: true, lastName: true, phone: true, email: true } },
+      },
+      orderBy: { scheduledDate: 'asc' },
+    });
+  }
+
+  // F-PS06: Review / Reschedule / Complete viewing appointment
+  async updateStatus(id: string, updateDto: UpdateViewingStatusExtendedDto) {
     const viewing = await this.prisma.viewingAppointment.findUnique({ where: { id } });
     if (!viewing) {
       throw new DomainError(ViewingErrorCodes.VIEWING_NOT_FOUND);
     }
 
+    const data: any = {
+      status: updateDto.status,
+      feedback: updateDto.feedback,
+    };
+
+    if (updateDto.newScheduledDate) {
+      data.scheduledDate = new Date(updateDto.newScheduledDate);
+    }
+
     return await this.prisma.viewingAppointment.update({
       where: { id },
-      data: { status: updateDto.status },
+      data,
+      include: { property: { select: { title: true } } },
     });
   }
 }
