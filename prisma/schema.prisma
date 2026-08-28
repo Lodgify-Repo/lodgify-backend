@@ -50,6 +50,8 @@ model User {
   propertyBookings PropertyBooking[] @relation("GuestPropertyBookings")
   sentPropertyMessages PropertyMessage[] @relation("SentPropertyMessages")
   receivedPropertyMessages PropertyMessage[] @relation("ReceivedPropertyMessages")
+  agentReviewsGiven    AgentReview[]      @relation("ClientAgentReviews")
+  agentInvitationsSent AgentInvitation[]  @relation("OwnerAgentInvitations")
 }
 
 enum Role {
@@ -698,6 +700,9 @@ model Property {
   pricingRules    PropertyPricingRule[]
   bookings        PropertyBooking[]
   messages        PropertyMessage[]
+  leads           Lead[]
+  commissions     CommissionRecord[]
+  agentInvitations AgentInvitation[]
 }
 
 model PropertyImage {
@@ -846,20 +851,41 @@ model AgentProfile {
   id              String   @id @default(uuid())
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id])
+  accountType     String   @default("INDIVIDUAL") // INDIVIDUAL, COMPANY
   agencyName      String?
   licenseNumber   String?
+  bio             String?
+  photoUrl        String?
+  specializations String[] // e.g. ["LUXURY_VILLAS", "COMMERCIAL", "SHORT_TERM_RENTALS", "RESIDENTIAL"]
+  areasServed     String[] // e.g. ["LEKKI", "VICTORIA_ISLAND", "IKOYI", "IKEJA"]
+  yearsOfExperience Int?
+  website         String?
+  socialLinks     Json?
+  
+  // Verification (F-AG02)
   licenseUrl      String?
   companyRegistrationUrl String?
+  idDocumentUrl   String?
+  isVerified      Boolean  @default(false)
+  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationNotes String?
+
   tier            String   @default("STANDARD") // STANDARD, PREMIUM
   commissionRate  Float    @default(5.0)
   totalSales      Float    @default(0)
-  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  bankAccountDetails Json? // Bank details for automated payouts
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   authorizations  AgentAuthorization[]
   leads           Lead[]
   commissions     CommissionRecord[]
+  reviews         AgentReview[]
+  invitations     AgentInvitation[]
+  viewings        ViewingAppointment[]
 }
 
 model AgentAuthorization {
@@ -868,8 +894,12 @@ model AgentAuthorization {
   agent           AgentProfile @relation(fields: [agentId], references: [id])
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id])
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String   @default("PENDING") // PENDING, APPROVED, DECLINED, REVOKED
+  pitchMessage    String?
+  proposedRate    Float?
   agreedRate      Float?
+  declineReason   String?
+  referralCode    String   @unique @default(uuid())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -880,27 +910,76 @@ model Lead {
   id              String   @id @default(uuid())
   agentId         String
   agent           AgentProfile @relation(fields: [agentId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
   name            String
   email           String?
   phone           String?
-  source          String?
-  status          String   @default("NEW") // NEW, CONTACTED, QUALIFIED, LOST
+  source          String?  // REFERRAL_LINK, DIRECT_INQUIRY, SOCIAL, MANUAL
+  status          String   @default("NEW") // NEW, CONTACTED, VIEWING_SCHEDULED, NEGOTIATING, CLOSED_WON, CLOSED_LOST
+  estimatedValue  Float?
   notes           String?
+  stageHistory    Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  viewings        ViewingAppointment[]
 }
 
 model CommissionRecord {
   id              String   @id @default(uuid())
   agentId         String
   agent           AgentProfile @relation(fields: [agentId], references: [id])
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id])
+  bookingId       String?
   transactionType String   // SALE, RENTAL
+  totalTransactionValue Float?
+  agreedRate      Float    @default(5.0)
   amount          Float
-  status          String   @default("PENDING") // PENDING, PAID
+  status          String   @default("PENDING") // PENDING, CONFIRMED, READY_FOR_PAYOUT, PAID
+  payoutMethod    String?  // PAYSTACK, BANK_TRANSFER
+  payoutReference String?
+  payoutReceiptUrl String?
   paidAt          DateTime?
   referenceId     String?  // ID of the sale/rental booking
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// F-AG12: Client Reviews for Agents
+model AgentReview {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  reviewerId      String
+  reviewer        User     @relation("ClientAgentReviews", fields: [reviewerId], references: [id])
+  professionalism Int      @default(5)
+  marketKnowledge Int      @default(5)
+  responsiveness  Int      @default(5)
+  overallRating   Float    @default(5.0)
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  @@index([agentId])
+}
+
+// F-AG04 & F-AG12: Owner Agent Invitation
+model AgentInvitation {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  ownerId         String
+  owner           User     @relation("OwnerAgentInvitations", fields: [ownerId], references: [id])
+  agentId         String
+  agent           AgentProfile @relation(fields: [agentId], references: [id])
+  proposedRate    Float?
+  message         String?
+  status          String   @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([agentId, status])
 }
 
 // ---------------------------------------------------------
@@ -928,12 +1007,17 @@ model ViewingAppointment {
   property        Property @relation(fields: [propertyId], references: [id])
   userId          String?
   user            User?    @relation(fields: [userId], references: [id])
+  agentId         String?
+  agent           AgentProfile? @relation(fields: [agentId], references: [id])
+  leadId          String?
+  lead            Lead?    @relation(fields: [leadId], references: [id])
   clientName      String
   clientEmail     String
   clientPhone     String
   scheduledDate   DateTime
-  status          String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  status          String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, RESCHEDULED
   notes           String?
+  feedback        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
