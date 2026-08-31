@@ -106,6 +106,9 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
     },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!@nestjs/schedule)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
