@@ -30,11 +30,18 @@ export const envValidationSchema = Joi.object({
   // ─── Third-Party: Paystack ──────────────────────────────
   PAYSTACK_SECRET_KEY: Joi.string().optional().allow(''),
 
-  // ─── Third-Party: Google ────────────────────────────────
-  GOOGLE_MAPS_KEY: Joi.string().optional().allow(''),
+  // ─── Third-Party: Geocoding (LocationIQ) ────────────────
+  LOCATIONIQ_API_KEY: Joi.string().optional().allow(''),
+
+  // ─── Third-Party: Google Auth ───────────────────────────
   GOOGLE_CLIENT_ID: Joi.string().optional().allow(''),
   GOOGLE_CLIENT_SECRET: Joi.string().optional().allow(''),
-  GCS_BUCKET: Joi.string().optional().allow(''),
+
+  // ─── Third-Party: Storage (Cloudinary) ──────────────────
+  CLOUDINARY_CLOUD_NAME: Joi.string().optional().allow(''),
+  CLOUDINARY_API_KEY: Joi.string().optional().allow(''),
+  CLOUDINARY_API_SECRET: Joi.string().optional().allow(''),
+  CLOUDINARY_URL: Joi.string().optional().allow(''),
 
   // ─── SMTP (Email) ──────────────────────────────────────
   SMTP_HOST: Joi.string().optional().allow(''),
