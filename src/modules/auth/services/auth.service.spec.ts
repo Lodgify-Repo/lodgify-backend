@@ -27,6 +27,9 @@ describe('AuthService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    hotel: {
+      findUnique: jest.fn(),
+    },
   };
 
   const mockJwt = {
@@ -142,6 +145,30 @@ describe('AuthService', () => {
 
       expect(mockPrisma.user.update).toHaveBeenCalled();
       expect(mockQueue.addJob).toHaveBeenCalled();
+    });
+  });
+
+  describe('login', () => {
+    it('should generate token with hotelId for HOTEL_OWNER', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'hotel-owner-1' });
+      mockPrisma.user.update.mockResolvedValue({});
+
+      const result = await service.login({
+        id: 'owner-id',
+        email: 'owner@hotel.com',
+        role: 'HOTEL_OWNER',
+        firstName: 'Hotel',
+        lastName: 'Owner',
+      });
+
+      expect(result.access_token).toBe('mocked-jwt-token');
+      expect(mockJwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hotelId: 'hotel-owner-1',
+          tenantId: 'hotel-owner-1',
+          tier: 'standard',
+        }),
+      );
     });
   });
 });

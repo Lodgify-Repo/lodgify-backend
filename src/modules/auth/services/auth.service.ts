@@ -44,7 +44,32 @@ export class AuthService extends Service {
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    // Resolve tenant context for the user
+    let hotelId: string | undefined;
+    const tier: 'standard' | 'enterprise' = 'standard';
+
+    if (user.role === 'HOTEL_OWNER') {
+      const hotel = await this.prisma.hotel.findUnique({
+        where: { ownerId: user.id },
+        select: { id: true },
+      });
+      hotelId = hotel?.id;
+    } else if (user.parentId) {
+      const parentHotel = await this.prisma.hotel.findUnique({
+        where: { ownerId: user.parentId },
+        select: { id: true },
+      });
+      hotelId = parentHotel?.id;
+    }
+
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: user.role,
+      hotelId,
+      tenantId: hotelId || user.id,
+      tier,
+    };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = crypto.randomUUID();
     
@@ -62,6 +87,7 @@ export class AuthService extends Service {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        hotelId,
       }
     };
   }

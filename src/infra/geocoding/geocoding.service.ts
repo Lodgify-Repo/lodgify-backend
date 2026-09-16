@@ -14,36 +14,49 @@ export class GeocodingService {
   private readonly apiKey: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('GOOGLE_MAPS_KEY', '');
+    this.apiKey = this.configService.get<string>('LOCATIONIQ_API_KEY', '');
   }
 
   /**
-   * Geocode a full address string into lat/lng coordinates using Google Maps Geocoding API.
+   * Geocode a full address string into lat/lng coordinates using LocationIQ Geocoding API.
    * Returns null if the API key is not configured or the geocoding request fails.
    */
   async geocode(address: string, city: string, state: string, country: string): Promise<GeocodingResult | null> {
     if (!this.apiKey) {
-      this.logger.warn('[GeocodingService]: GOOGLE_MAPS_KEY not configured — skipping geocoding');
+      this.logger.warn('[GeocodingService]: LOCATIONIQ_API_KEY not configured — skipping geocoding');
       return null;
     }
 
     const fullAddress = [address, city, state, country].filter(Boolean).join(', ');
 
     try {
-      const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-      url.searchParams.set('address', fullAddress);
+      const url = new URL('https://us1.locationiq.com/v1/search');
+      url.searchParams.set('q', fullAddress);
       url.searchParams.set('key', this.apiKey);
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('limit', '1');
 
       const response = await fetch(url.toString());
-      const data = await response.json();
-
-      if (data.status !== 'OK' || !data.results?.length) {
-        this.logger.warn(`[GeocodingService]: Geocoding failed for "${fullAddress}" — status: ${data.status}`);
+      if (!response.ok) {
+        this.logger.warn(`[GeocodingService]: Geocoding failed for "${fullAddress}" — status: ${response.status} ${response.statusText}`);
         return null;
       }
 
-      const { lat, lng } = data.results[0].geometry.location;
-      const formattedAddress = data.results[0].formatted_address;
+      const data = await response.json();
+
+      if (!Array.isArray(data) || !data.length) {
+        this.logger.warn(`[GeocodingService]: Geocoding returned no results for "${fullAddress}"`);
+        return null;
+      }
+
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      const formattedAddress = data[0].display_name || fullAddress;
+
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        this.logger.warn(`[GeocodingService]: Invalid coordinates returned for "${fullAddress}"`);
+        return null;
+      }
 
       this.logger.info(`[GeocodingService]: Geocoded "${fullAddress}" → (${lat}, ${lng})`);
 
